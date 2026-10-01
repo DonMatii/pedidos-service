@@ -4,38 +4,47 @@ import cl.ochodigital.pasteleriamydreams.pedidosservice.dto.PedidoRequest;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.dto.PedidoResponse;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.model.Pedido;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.repository.PedidoRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
-// Pruebas unitarias del servicio de pedidos (repositorio simulado, sin H2 ni Kafka)
-@ExtendWith(MockitoExtension.class)
+// Pruebas unitarias del servicio de pedidos (repositorio y Kafka simulados, sin H2 ni broker)
 class PedidoServiceTest {
 
-    @Mock
     private PedidoRepository pedidoRepository;
-
-    @InjectMocks
+    private KafkaTemplate<String, String> kafkaTemplate;
     private PedidoService pedidoService;
+
+    @BeforeEach
+    void preparar() {
+        pedidoRepository = mock(PedidoRepository.class);
+        kafkaTemplate = mock(KafkaTemplate.class);
+        ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+        pedidoService = new PedidoService(pedidoRepository, kafkaTemplate, objectMapper, "pedidos");
+
+        // El broker confirma la publicación en los casos donde el pedido es válido
+        when(kafkaTemplate.send(anyString(), anyString()))
+                .thenReturn(CompletableFuture.<SendResult<String, String>>completedFuture(null));
+    }
 
     @Test
     void registrarCalculaElTotalSumandoTodosLosItems() {
-        // 1 torta a 18.990 + 6 cupcakes a 2.500 = 33.990
-        when(pedidoRepository.save(any(Pedido.class))).thenAnswer(invocation -> {
-            Pedido pedido = invocation.getArgument(0);
-            pedido.setId(7L);
-            return pedido;
-        });
+        alPersistirAsignarId(7L);
 
         PedidoResponse respuesta = pedidoService.registrar(solicitudValida());
 
@@ -44,16 +53,12 @@ class PedidoServiceTest {
         assertEquals(2, respuesta.getProductos().size());
         assertEquals(18990, respuesta.getProductos().get(0).getSubtotal());
         assertEquals(15000, respuesta.getProductos().get(1).getSubtotal());
-        assertFalse(respuesta.isEventoPublicado());
+        assertTrue(respuesta.isEventoPublicado());
     }
 
     @Test
     void registrarPersisteElPedidoConElTotalCalculado() {
-        when(pedidoRepository.save(any(Pedido.class))).thenAnswer(invocation -> {
-            Pedido pedido = invocation.getArgument(0);
-            pedido.setId(1L);
-            return pedido;
-        });
+        alPersistirAsignarId(1L);
 
         pedidoService.registrar(solicitudValida());
 
@@ -71,12 +76,42 @@ class PedidoServiceTest {
     }
 
     @Test
+    void registrarPublicaElJsonDelPedidoCreado() {
+        alPersistirAsignarId(42L);
+
+        pedidoService.registrar(solicitudValida());
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(kafkaTemplate).send(eq("pedidos"), captor.capture());
+
+        String json = captor.getValue();
+        assertTrue(json.contains("\"evento\":\"PedidoCreado\""));
+        assertTrue(json.contains("\"id\":42"));
+        assertTrue(json.contains("Torta de chocolate, Cupcakes vainilla"));
+        assertTrue(json.contains("\"cantidad\":7"));
+    }
+
+    @Test
+    void registrarRespondeEventoNoPublicadoSiKafkaFallaPeroElPedidoQuedaGuardado() {
+        alPersistirAsignarId(11L);
+        CompletableFuture<SendResult<String, String>> falla = new CompletableFuture<>();
+        falla.completeExceptionally(new RuntimeException("broker caído"));
+        when(kafkaTemplate.send(anyString(), anyString())).thenReturn(falla);
+
+        PedidoResponse respuesta = pedidoService.registrar(solicitudValida());
+
+        assertFalse(respuesta.isEventoPublicado());
+        assertEquals(33990, respuesta.getTotal());
+        verify(pedidoRepository).save(any(Pedido.class));
+    }
+
+    @Test
     void registrarRechazaClienteEnBlanco() {
         PedidoRequest solicitud = solicitudValida();
         solicitud.setCliente("   ");
 
         assertThrows(IllegalArgumentException.class, () -> pedidoService.registrar(solicitud));
-        verify(pedidoRepository, never()).save(any(Pedido.class));
+        verificarQueNoSeGuarda();
     }
 
     @Test
@@ -85,7 +120,7 @@ class PedidoServiceTest {
         solicitud.setEmail(null);
 
         assertThrows(IllegalArgumentException.class, () -> pedidoService.registrar(solicitud));
-        verify(pedidoRepository, never()).save(any(Pedido.class));
+        verificarQueNoSeGuarda();
     }
 
     @Test
@@ -94,7 +129,7 @@ class PedidoServiceTest {
         solicitud.setProductos(List.of());
 
         assertThrows(IllegalArgumentException.class, () -> pedidoService.registrar(solicitud));
-        verify(pedidoRepository, never()).save(any(Pedido.class));
+        verificarQueNoSeGuarda();
     }
 
     @Test
@@ -103,7 +138,7 @@ class PedidoServiceTest {
         solicitud.getProductos().get(0).setCantidad(0);
 
         assertThrows(IllegalArgumentException.class, () -> pedidoService.registrar(solicitud));
-        verify(pedidoRepository, never()).save(any(Pedido.class));
+        verificarQueNoSeGuarda();
     }
 
     @Test
@@ -112,7 +147,7 @@ class PedidoServiceTest {
         solicitud.getProductos().get(1).setPrecioUnitario(-100);
 
         assertThrows(IllegalArgumentException.class, () -> pedidoService.registrar(solicitud));
-        verify(pedidoRepository, never()).save(any(Pedido.class));
+        verificarQueNoSeGuarda();
     }
 
     @Test
@@ -138,6 +173,20 @@ class PedidoServiceTest {
         assertTrue(pedidoService.obtener(99L).isEmpty());
     }
 
+    // El repositorio devuelve el pedido con su id generado
+    private void alPersistirAsignarId(Long id) {
+        when(pedidoRepository.save(any(Pedido.class))).thenAnswer(invocation -> {
+            Pedido pedido = invocation.getArgument(0);
+            pedido.setId(id);
+            return pedido;
+        });
+    }
+
+    private void verificarQueNoSeGuarda() {
+        verify(pedidoRepository, never()).save(any(Pedido.class));
+        verify(kafkaTemplate, never()).send(anyString(), anyString());
+    }
+
     // Solicitud válida de ejemplo: 1 torta + 6 cupcakes
     private PedidoRequest solicitudValida() {
         PedidoRequest.ProductoRequest torta = new PedidoRequest.ProductoRequest();
@@ -153,7 +202,7 @@ class PedidoServiceTest {
         PedidoRequest solicitud = new PedidoRequest();
         solicitud.setCliente("Daniela Soto");
         solicitud.setEmail("daniela@ejemplo.cl");
-        solicitud.setProductos(new java.util.ArrayList<>(List.of(torta, cupcakes)));
+        solicitud.setProductos(new ArrayList<>(List.of(torta, cupcakes)));
         return solicitud;
     }
 }
