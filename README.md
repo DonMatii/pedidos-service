@@ -38,3 +38,15 @@ Este microservicio **consumirá y publicará en el topic `pedidos`**. La configu
 ```
 
 Los tests corren sobre H2 en memoria (ver `src/test/resources/application.properties`), por lo que no requieren MySQL ni Kafka levantados.
+
+## 🐳 Kafka local
+
+Broker Kafka local (KRaft, sin ZooKeeper) vía Docker Compose:
+
+```powershell
+docker compose up -d   # levanta el broker en el puerto 9092, con topic `pedidos`
+docker compose down    # baja el broker (conserva los datos)
+docker compose down -v # baja el broker y BORRA los datos (volumen)
+```
+
+Es solo para desarrollo local. El despliegue en la nube usará el mismo `docker-compose.yml` en EC2.
