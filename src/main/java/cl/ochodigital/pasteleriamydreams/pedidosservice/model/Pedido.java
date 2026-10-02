@@ -30,6 +30,10 @@ public class Pedido {
     @Column(nullable = false)
     private Integer total;
 
+    // Estado del pedido en su ciclo de vida (RF-11): RECIBIDO, EN_PREPARACION, DESPACHADO o ENTREGADO
+    @Column(nullable = false)
+    private String estado = "RECIBIDO";
+
     // Detalle del pedido: se crea y borra junto con el pedido padre
     @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<PedidoItem> items = new ArrayList<>();

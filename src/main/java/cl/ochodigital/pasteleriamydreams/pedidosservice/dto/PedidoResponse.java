@@ -14,6 +14,8 @@ public class PedidoResponse {
     private String email;
     private LocalDateTime fecha;
     private Integer total;
+    // Estado actual del pedido que devuelven los endpoints (RF-11)
+    private String estado;
     private List<ProductoResponse> productos;
     // true cuando el evento PedidoCreado fue confirmado por Kafka (T5)
     private boolean eventoPublicado;

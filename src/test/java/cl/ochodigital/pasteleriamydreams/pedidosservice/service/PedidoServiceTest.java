@@ -173,6 +173,55 @@ class PedidoServiceTest {
         assertTrue(pedidoService.obtener(99L).isEmpty());
     }
 
+    @Test
+    void registrarAsignaElEstadoRecibidoPorDefecto() {
+        alPersistirAsignarId(5L);
+
+        PedidoResponse respuesta = pedidoService.registrar(solicitudValida());
+
+        assertEquals("RECIBIDO", respuesta.getEstado());
+    }
+
+    @Test
+    void cambiarEstadoActualizaElPedidoYLoPersiste() {
+        Pedido pedido = new Pedido();
+        pedido.setId(3L);
+        pedido.setCliente("Daniela Soto");
+        pedido.setEmail("daniela@ejemplo.cl");
+        pedido.setTotal(18990);
+        when(pedidoRepository.findById(3L)).thenReturn(Optional.of(pedido));
+        when(pedidoRepository.save(any(Pedido.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Optional<PedidoResponse> respuesta = pedidoService.cambiarEstado(3L, "ENTREGADO");
+
+        assertTrue(respuesta.isPresent());
+        assertEquals(3L, respuesta.get().getId());
+        assertEquals("ENTREGADO", respuesta.get().getEstado());
+        assertEquals("ENTREGADO", pedido.getEstado());
+        verify(pedidoRepository).save(pedido);
+    }
+
+    @Test
+    void cambiarEstadoRechazaUnEstadoFueraDelSetValido() {
+        Pedido pedido = new Pedido();
+        pedido.setId(3L);
+        when(pedidoRepository.findById(3L)).thenReturn(Optional.of(pedido));
+
+        IllegalArgumentException excepcion = assertThrows(IllegalArgumentException.class,
+                () -> pedidoService.cambiarEstado(3L, "CANCELADO"));
+
+        assertEquals("Estado invalido: CANCELADO", excepcion.getMessage());
+        verify(pedidoRepository, never()).save(any(Pedido.class));
+    }
+
+    @Test
+    void cambiarEstadoDevuelveVacioCuandoElPedidoNoExiste() {
+        when(pedidoRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertTrue(pedidoService.cambiarEstado(99L, "ENTREGADO").isEmpty());
+        verify(pedidoRepository, never()).save(any(Pedido.class));
+    }
+
     // El repositorio devuelve el pedido con su id generado
     private void alPersistirAsignarId(Long id) {
         when(pedidoRepository.save(any(Pedido.class))).thenAnswer(invocation -> {

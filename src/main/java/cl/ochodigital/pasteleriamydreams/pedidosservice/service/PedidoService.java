@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -26,6 +27,10 @@ public class PedidoService {
 
     // Espera máxima de la confirmación de Kafka dentro del request
     private static final int TIMEOUT_PUBLICACION_SEGUNDOS = 5;
+
+    // Estados válidos de un pedido (RF-11): todo lo demás se rechaza con 400
+    private static final Set<String> ESTADOS_VALIDOS =
+            Set.of("RECIBIDO", "EN_PREPARACION", "DESPACHADO", "ENTREGADO");
 
     private final PedidoRepository pedidoRepository;
     private final KafkaTemplate<String, String> kafkaTemplate;
@@ -81,6 +86,21 @@ public class PedidoService {
         return pedidoRepository.findAllByOrderByIdDesc().stream()
                 .map(pedido -> armarRespuesta(pedido, false))
                 .toList();
+    }
+
+    // Cambia el estado de un pedido, lo persiste y devuelve la respuesta actualizada (RF-11)
+    public Optional<PedidoResponse> cambiarEstado(Long id, String estado) {
+        Optional<Pedido> pedido = pedidoRepository.findById(id);
+        if (pedido.isEmpty()) {
+            return Optional.empty();
+        }
+        if (estado == null || !ESTADOS_VALIDOS.contains(estado)) {
+            throw new IllegalArgumentException("Estado invalido: " + estado);
+        }
+        Pedido actualizado = pedido.get();
+        actualizado.setEstado(estado);
+        Pedido guardado = pedidoRepository.save(actualizado);
+        return Optional.of(armarRespuesta(guardado, false));
     }
 
     // Publica PedidoCreado y devuelve true solo si el broker confirmó a tiempo
@@ -147,6 +167,7 @@ public class PedidoService {
         respuesta.setEmail(pedido.getEmail());
         respuesta.setFecha(pedido.getFecha());
         respuesta.setTotal(pedido.getTotal());
+        respuesta.setEstado(pedido.getEstado());
         respuesta.setEventoPublicado(eventoPublicado);
         respuesta.setProductos(pedido.getItems().stream().map(this::armarProducto).toList());
         return respuesta;

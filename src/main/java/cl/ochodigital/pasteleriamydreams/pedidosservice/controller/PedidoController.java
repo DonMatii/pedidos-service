@@ -46,4 +46,16 @@ public class PedidoController {
     public List<PedidoResponse> listarPedidos() {
         return pedidoService.listar();
     }
+
+    // Cambiar el estado de un pedido (RF-11)
+    @PatchMapping("/{id}/estado")
+    public ResponseEntity<?> cambiarEstadoPedido(@PathVariable Long id, @RequestBody Map<String, String> cuerpo) {
+        try {
+            return pedidoService.cambiarEstado(id, cuerpo.get("estado"))
+                    .map(ResponseEntity::ok)
+                    .orElseGet(() -> ResponseEntity.notFound().build());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("mensaje", e.getMessage()));
+        }
+    }
 }
