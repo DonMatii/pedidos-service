@@ -30,6 +30,7 @@ Diseñado y construido por **8 Digital**.
 | `POST` | `/api/pedidos` | Registra un pedido nuevo: lo persiste y publica el evento `PedidoCreado` en Kafka. |
 | `GET` | `/api/pedidos` | Lista todos los pedidos, los más recientes primero. |
 | `GET` | `/api/pedidos/{id}` | Consulta un pedido por su id (devuelve `404` si no existe). |
+| `PATCH` | `/api/pedidos/{id}/estado` | Cambia el estado de un pedido (RF-11): `200` actualizado, `400` si el estado no es válido, `404` si no existe. |
 
 CORS está abierto solo para el frontend local `http://localhost:5173`.
 
@@ -85,6 +86,10 @@ Devuelve un arreglo con todos los pedidos (mismo shape que la respuesta del `POS
 ### GET /api/pedidos/{id}
 
 Devuelve `200` con el pedido, o `404` si el id no existe.
+
+### PATCH /api/pedidos/{id}/estado
+
+Cambia el estado de un pedido (RF-11). Cuerpo: `{"estado": "EN_PREPARACION"}`. Estados válidos: `RECIBIDO` (estado con el que nace todo pedido), `EN_PREPARACION`, `DESPACHADO`, `ENTREGADO`. Devuelve `200` con el pedido actualizado, `400` con `{"mensaje": ...}` si el estado no es válido, o `404` si el id no existe. La columna `estado` la agrega automáticamente `ddl-auto=update` al arrancar.
 
 ## 📨 Kafka (RF-08 / RNF-08)
 
@@ -176,7 +181,7 @@ docker compose up -d         # broker Kafka (en este repo)
 .\mvnw.cmd test
 ```
 
-Los tests corren sobre H2 en memoria (ver `src/test/resources/application.properties`), por lo que no requieren MySQL ni Kafka levantados: hay tests unitarios del servicio y un test de integración de publicación con broker embebido (`@EmbeddedKafka`).
+Los tests corren sobre H2 en memoria (ver `src/test/resources/application.properties`), por lo que no requieren MySQL ni Kafka levantados: hay tests unitarios del servicio, tests MockMvc de los endpoints (incluido el cambio de estado RF-11) y un test de integración de publicación con broker embebido (`@EmbeddedKafka`).
 
 ## 🔄 Flujo end-to-end
 
