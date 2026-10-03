@@ -197,3 +197,10 @@ Kafka topic `pedidos`
    ├──▶ notificaciones-service (8083)  → persiste la notificación (estado PENDIENTE)
    └──▶ estadisticas-service  (8081)   → actualiza pedidosTotales / montoTotalPedidos
 ```
+
+## Seguridad (v2)
+
+- **Públicos sin autenticación:** `POST /api/pedidos` (crear pedido) y `GET /api/pedidos/seguimiento/{codigo}` (consulta pública RF-11).
+- **Protegidos con header `X-Api-Key`:** `GET /api/pedidos` (listado), `GET /api/pedidos/{id}` y `PATCH /api/pedidos/{id}/estado`.
+- La clave se configura en la variable de entorno `APP_ADMIN_API_KEY` (propiedad `app.admin-api-key`). Si no está definida, los endpoints protegidos responden `503` (fail-closed: nunca quedan abiertos por omisión).
+- **Protección IDOR:** al registrar un pedido se genera un *código de seguimiento* opaco (UUID de 32 caracteres) que se devuelve en la respuesta del `POST`. La consulta pública usa ese código y **nunca** el id secuencial, de modo que no es posible adivinar pedidos de otros clientes.
