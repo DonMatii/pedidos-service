@@ -204,3 +204,10 @@ Kafka topic `pedidos`
 - **Protegidos con header `X-Api-Key`:** `GET /api/pedidos` (listado), `GET /api/pedidos/{id}` y `PATCH /api/pedidos/{id}/estado`.
 - La clave se configura en la variable de entorno `APP_ADMIN_API_KEY` (propiedad `app.admin-api-key`). Si no está definida, los endpoints protegidos responden `503` (fail-closed: nunca quedan abiertos por omisión).
 - **Protección IDOR:** al registrar un pedido se genera un *código de seguimiento* opaco (UUID de 32 caracteres) que se devuelve en la respuesta del `POST`. La consulta pública usa ese código y **nunca** el id secuencial, de modo que no es posible adivinar pedidos de otros clientes.
+
+## Descuento de bienvenida (primera conexión)
+
+- `POST /api/pedidos` acepta el campo opcional `codigoDescuento`. Con el código `BIENVENIDO10` aplica **-10%** sobre la suma de los items: el pedido persiste `codigoDescuento`, `descuento` y `total = subtotal - descuento` en la base de datos.
+- Códigos desconocidos se rechazan con `400` y mensaje de error.
+- El frontend entrega el código solo la **primera vez** que un cliente inicia sesión (bandera en `localStorage`), lo muestra en el Home, lo aplica en la página de pedido y lo consume tras el registro. El backend solo valida y persiste.
+- La consulta pública `GET /api/pedidos/seguimiento/{codigo}` refleja el total con descuento.

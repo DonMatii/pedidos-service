@@ -254,6 +254,31 @@ class PedidoServiceTest {
         verify(pedidoRepository, never()).save(any(Pedido.class));
     }
 
+    @Test
+    void registrarAplicaElDescuentoDeBienvenidaSobreElSubtotal() {
+        alPersistirAsignarId(7L);
+        PedidoRequest solicitud = solicitudValida();
+        solicitud.setCodigoDescuento("BIENVENIDO10");
+
+        PedidoResponse respuesta = pedidoService.registrar(solicitud);
+
+        assertEquals(33990, respuesta.getSubtotal());
+        assertEquals(3399, respuesta.getDescuento());
+        assertEquals(30591, respuesta.getTotal());
+        assertEquals("BIENVENIDO10", respuesta.getCodigoDescuento());
+    }
+
+    @Test
+    void registrarRechazaUnCodigoDeDescuentoDesconocido() {
+        PedidoRequest solicitud = solicitudValida();
+        solicitud.setCodigoDescuento("AHORRO50");
+
+        IllegalArgumentException excepcion = assertThrows(IllegalArgumentException.class,
+                () -> pedidoService.registrar(solicitud));
+        assertTrue(excepcion.getMessage().contains("inválido"));
+        verificarQueNoSeGuarda();
+    }
+
     // El repositorio devuelve el pedido con su id generado
     private void alPersistirAsignarId(Long id) {
         when(pedidoRepository.save(any(Pedido.class))).thenAnswer(invocation -> {

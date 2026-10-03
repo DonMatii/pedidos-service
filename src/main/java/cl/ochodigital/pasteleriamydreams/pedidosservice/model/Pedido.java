@@ -39,6 +39,12 @@ public class Pedido {
     @Column(unique = true)
     private String codigoConsulta;
 
+    // Codigo de descuento aplicado (ej: BIENVENIDO10 de la primera conexion); nulo si no hubo
+    private String codigoDescuento;
+
+    // Monto del descuento en pesos (nulo si no hubo); total = suma de items - descuento
+    private Integer descuento;
+
     // Detalle del pedido: se crea y borra junto con el pedido padre
     @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<PedidoItem> items = new ArrayList<>();

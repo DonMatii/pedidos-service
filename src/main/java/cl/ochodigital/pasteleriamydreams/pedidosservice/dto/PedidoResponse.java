@@ -19,6 +19,10 @@ public class PedidoResponse {
 
     // Codigo opaco de seguimiento para la consulta publica (RF-11)
     private String codigoConsulta;
+    // Resumen del descuento de bienvenida: subtotal = total + descuento
+    private Integer subtotal;
+    private String codigoDescuento;
+    private Integer descuento;
     private List<ProductoResponse> productos;
     // true cuando el evento PedidoCreado fue confirmado por Kafka (T5)
     private boolean eventoPublicado;

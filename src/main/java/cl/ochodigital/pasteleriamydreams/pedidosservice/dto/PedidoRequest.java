@@ -11,6 +11,8 @@ public class PedidoRequest {
     private String cliente;
     private String email;
     private List<ProductoRequest> productos;
+    // Codigo de descuento opcional (BIENVENIDO10 = -10% de bienvenida)
+    private String codigoDescuento;
 
     // Producto pedido: nombre del catálogo, cantidad y precio unitario
     @Data

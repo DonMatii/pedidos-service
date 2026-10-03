@@ -33,6 +33,10 @@ public class PedidoService {
     private static final Set<String> ESTADOS_VALIDOS =
             Set.of("RECIBIDO", "EN_PREPARACION", "DESPACHADO", "ENTREGADO");
 
+    // Codigo de bienvenida: -10% en el primer pedido de quien se conecta la primera vez
+    public static final String CODIGO_BIENVENIDO = "BIENVENIDO10";
+    private static final int PORCENTAJE_BIENVENIDO = 10;
+
     private final PedidoRepository pedidoRepository;
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
@@ -59,7 +63,7 @@ public class PedidoService {
         // Codigo opaco de seguimiento: la consulta publica usa este codigo, nunca el id
         pedido.setCodigoConsulta(UUID.randomUUID().toString().replace("-", ""));
 
-        int total = 0;
+        int subtotal = 0;
         for (PedidoRequest.ProductoRequest producto : solicitud.getProductos()) {
             PedidoItem item = new PedidoItem();
             item.setNombre(producto.getNombre().trim());
@@ -67,9 +71,17 @@ public class PedidoService {
             item.setPrecioUnitario(producto.getPrecioUnitario());
             item.setPedido(pedido);
             pedido.getItems().add(item);
-            total += producto.getCantidad() * producto.getPrecioUnitario();
+            subtotal += producto.getCantidad() * producto.getPrecioUnitario();
         }
-        pedido.setTotal(total);
+
+        // Descuento de bienvenida: solo aplica si llego el codigo valido (validado arriba)
+        String codigo = (solicitud.getCodigoDescuento() == null || solicitud.getCodigoDescuento().isBlank())
+                ? null
+                : CODIGO_BIENVENIDO;
+        int descuento = (codigo != null) ? subtotal * PORCENTAJE_BIENVENIDO / 100 : 0;
+        pedido.setCodigoDescuento(codigo);
+        pedido.setDescuento(descuento);
+        pedido.setTotal(subtotal - descuento);
 
         // 1) Primero se persiste: el pedido nunca se pierde aunque Kafka falle
         Pedido guardado = pedidoRepository.save(pedido);
@@ -158,6 +170,11 @@ public class PedidoService {
         if (solicitud.getProductos() == null || solicitud.getProductos().isEmpty()) {
             throw new IllegalArgumentException("El pedido debe incluir al menos un producto");
         }
+        String codigoDescuento = solicitud.getCodigoDescuento();
+        if (codigoDescuento != null && !codigoDescuento.isBlank()
+                && !CODIGO_BIENVENIDO.equalsIgnoreCase(codigoDescuento.trim())) {
+            throw new IllegalArgumentException("Código de descuento inválido: " + codigoDescuento.trim());
+        }
         for (PedidoRequest.ProductoRequest producto : solicitud.getProductos()) {
             if (producto == null || producto.getNombre() == null || producto.getNombre().isBlank()) {
                 throw new IllegalArgumentException("Cada producto debe tener un nombre");
@@ -178,7 +195,11 @@ public class PedidoService {
         respuesta.setCliente(pedido.getCliente());
         respuesta.setEmail(pedido.getEmail());
         respuesta.setFecha(pedido.getFecha());
+        int descuento = pedido.getDescuento() == null ? 0 : pedido.getDescuento();
         respuesta.setTotal(pedido.getTotal());
+        respuesta.setSubtotal(pedido.getTotal() + descuento);
+        respuesta.setDescuento(descuento);
+        respuesta.setCodigoDescuento(pedido.getCodigoDescuento());
         respuesta.setEstado(pedido.getEstado());
         respuesta.setCodigoConsulta(pedido.getCodigoConsulta());
         respuesta.setEventoPublicado(eventoPublicado);
