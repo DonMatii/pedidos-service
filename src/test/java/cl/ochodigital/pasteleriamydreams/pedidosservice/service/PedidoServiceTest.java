@@ -279,6 +279,34 @@ class PedidoServiceTest {
         verificarQueNoSeGuarda();
     }
 
+    @Test
+    void registrarRechazaElCodigoYaCanjeadoPorElMismoEmail() {
+        // Uso unico por email: el backend manda, no el navegador
+        when(pedidoRepository.existsByEmailIgnoreCaseAndCodigoDescuento(
+                "daniela@ejemplo.cl", "BIENVENIDO10")).thenReturn(true);
+        PedidoRequest solicitud = solicitudValida();
+        solicitud.setCodigoDescuento("BIENVENIDO10");
+
+        IllegalArgumentException excepcion = assertThrows(IllegalArgumentException.class,
+                () -> pedidoService.registrar(solicitud));
+        assertTrue(excepcion.getMessage().contains("ya fue canjeado"));
+        verificarQueNoSeGuarda();
+    }
+
+    @Test
+    void registrarAceptaElCodigoCuandoElEmailTodaviaNoLoCanjeo() {
+        when(pedidoRepository.existsByEmailIgnoreCaseAndCodigoDescuento(
+                "daniela@ejemplo.cl", "BIENVENIDO10")).thenReturn(false);
+        alPersistirAsignarId(8L);
+        PedidoRequest solicitud = solicitudValida();
+        solicitud.setCodigoDescuento("BIENVENIDO10");
+
+        PedidoResponse respuesta = pedidoService.registrar(solicitud);
+
+        assertEquals(3399, respuesta.getDescuento());
+        assertEquals("BIENVENIDO10", respuesta.getCodigoDescuento());
+    }
+
     // El repositorio devuelve el pedido con su id generado
     private void alPersistirAsignarId(Long id) {
         when(pedidoRepository.save(any(Pedido.class))).thenAnswer(invocation -> {

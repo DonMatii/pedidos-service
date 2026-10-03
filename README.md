@@ -209,5 +209,6 @@ Kafka topic `pedidos`
 
 - `POST /api/pedidos` acepta el campo opcional `codigoDescuento`. Con el código `BIENVENIDO10` aplica **-10%** sobre la suma de los items: el pedido persiste `codigoDescuento`, `descuento` y `total = subtotal - descuento` en la base de datos.
 - Códigos desconocidos se rechazan con `400` y mensaje de error.
-- El frontend entrega el código solo la **primera vez** que un cliente inicia sesión (bandera en `localStorage`), lo muestra en el Home, lo aplica en la página de pedido y lo consume tras el registro. El backend solo valida y persiste.
+- **Uso único por email:** si el mismo email intenta canjear `BIENVENIDO10` una segunda vez, el backend responde `400` con `El código de descuento ya fue canjeado para este email`. Cada cliente nuevo (otro email) puede usarlo una vez.
+- El frontend entrega el código solo la **primera vez** que un cliente inicia sesión (bandera en `localStorage`), lo muestra en el Home, lo aplica en la página de pedido y lo consume tras el registro. El backend valida y persiste.
 - La consulta pública `GET /api/pedidos/seguimiento/{codigo}` refleja el total con descuento.

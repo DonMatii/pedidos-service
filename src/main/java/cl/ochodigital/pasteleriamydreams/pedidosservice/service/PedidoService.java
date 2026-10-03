@@ -175,6 +175,14 @@ public class PedidoService {
                 && !CODIGO_BIENVENIDO.equalsIgnoreCase(codigoDescuento.trim())) {
             throw new IllegalArgumentException("Código de descuento inválido: " + codigoDescuento.trim());
         }
+        // Uso unico por email: si ese email ya canjeo el codigo, el backend lo rechaza
+        if (codigoDescuento != null && !codigoDescuento.isBlank()
+                && CODIGO_BIENVENIDO.equalsIgnoreCase(codigoDescuento.trim())
+                && pedidoRepository.existsByEmailIgnoreCaseAndCodigoDescuento(
+                        solicitud.getEmail().trim(), CODIGO_BIENVENIDO)) {
+            throw new IllegalArgumentException(
+                    "El código de descuento ya fue canjeado para este email");
+        }
         for (PedidoRequest.ProductoRequest producto : solicitud.getProductos()) {
             if (producto == null || producto.getNombre() == null || producto.getNombre().isBlank()) {
                 throw new IllegalArgumentException("Cada producto debe tener un nombre");

@@ -14,4 +14,7 @@ public interface PedidoRepository extends JpaRepository<Pedido, Long> {
 
     // Consulta publica por el codigo opaco de seguimiento (RF-11)
     Optional<Pedido> findByCodigoConsulta(String codigoConsulta);
+
+    // Uso unico del codigo de bienvenida: ese email ya lo canjeo?
+    boolean existsByEmailIgnoreCaseAndCodigoDescuento(String email, String codigoDescuento);
 }

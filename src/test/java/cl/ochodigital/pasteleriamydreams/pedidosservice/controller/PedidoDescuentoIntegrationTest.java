@@ -80,4 +80,44 @@ class PedidoDescuentoIntegrationTest {
                 .andExpect(jsonPath("$.descuento").value(0))
                 .andExpect(jsonPath("$.total").value(30000));
     }
+
+    @Test
+    void segundoPedidoMismoEmailYCodigoResponde400() throws Exception {
+        // Primer canje: sale bien
+        mockMvc.perform(post("/api/pedidos")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cliente\":\"Repetidor\",\"email\":\"repetidor@ejemplo.cl\","
+                                + "\"codigoDescuento\":\"BIENVENIDO10\","
+                                + "\"productos\":[{\"nombre\":\"Torta\",\"cantidad\":1,\"precioUnitario\":10000}]}"))
+                .andExpect(status().isCreated());
+
+        // Uso unico por email: el segundo intento con el MISMO email y codigo se rechaza
+        mockMvc.perform(post("/api/pedidos")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cliente\":\"Repetidor\",\"email\":\"repetidor@ejemplo.cl\","
+                                + "\"codigoDescuento\":\"BIENVENIDO10\","
+                                + "\"productos\":[{\"nombre\":\"Torta\",\"cantidad\":1,\"precioUnitario\":10000}]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensaje")
+                        .value("El código de descuento ya fue canjeado para este email"));
+    }
+
+    @Test
+    void otroEmailPuedeUsarElMismoCodigo() throws Exception {
+        // Cada cliente nuevo se lleva su bienvenida: el codigo no es global
+        mockMvc.perform(post("/api/pedidos")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cliente\":\"Uno\",\"email\":\"uno@ejemplo.cl\","
+                                + "\"codigoDescuento\":\"BIENVENIDO10\","
+                                + "\"productos\":[{\"nombre\":\"Torta\",\"cantidad\":1,\"precioUnitario\":10000}]}"))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/pedidos")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cliente\":\"Otro\",\"email\":\"otro@ejemplo.cl\","
+                                + "\"codigoDescuento\":\"BIENVENIDO10\","
+                                + "\"productos\":[{\"nombre\":\"Torta\",\"cantidad\":1,\"precioUnitario\":10000}]}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.descuento").value(1000));
+    }
 }
