@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -55,6 +56,8 @@ public class PedidoService {
         Pedido pedido = new Pedido();
         pedido.setCliente(solicitud.getCliente().trim());
         pedido.setEmail(solicitud.getEmail().trim());
+        // Codigo opaco de seguimiento: la consulta publica usa este codigo, nunca el id
+        pedido.setCodigoConsulta(UUID.randomUUID().toString().replace("-", ""));
 
         int total = 0;
         for (PedidoRequest.ProductoRequest producto : solicitud.getProductos()) {
@@ -76,9 +79,18 @@ public class PedidoService {
         return armarRespuesta(guardado, eventoPublicado);
     }
 
-    // Busca un pedido por su id (devuelve vacío si no existe)
+    // Busca un pedido por su id (uso interno/administrativo, protegido con API key)
     public Optional<PedidoResponse> obtener(Long id) {
         return pedidoRepository.findById(id).map(pedido -> armarRespuesta(pedido, false));
+    }
+
+    // Busca un pedido por su codigo opaco de seguimiento (consulta publica RF-11)
+    public Optional<PedidoResponse> obtenerPorCodigo(String codigo) {
+        if (codigo == null || codigo.isBlank()) {
+            return Optional.empty();
+        }
+        return pedidoRepository.findByCodigoConsulta(codigo.trim())
+                .map(pedido -> armarRespuesta(pedido, false));
     }
 
     // Lista todos los pedidos del más reciente al más antiguo
@@ -168,6 +180,7 @@ public class PedidoService {
         respuesta.setFecha(pedido.getFecha());
         respuesta.setTotal(pedido.getTotal());
         respuesta.setEstado(pedido.getEstado());
+        respuesta.setCodigoConsulta(pedido.getCodigoConsulta());
         respuesta.setEventoPublicado(eventoPublicado);
         respuesta.setProductos(pedido.getItems().stream().map(this::armarProducto).toList());
         return respuesta;

@@ -57,6 +57,38 @@ class PedidoServiceTest {
     }
 
     @Test
+    void registrarGeneraUnCodigoDeSeguimientoOpacoDe32Caracteres() {
+        alPersistirAsignarId(7L);
+
+        PedidoResponse respuesta = pedidoService.registrar(solicitudValida());
+
+        // UUID sin guiones: 32 hex a los que no se puede adivinar (proteccion IDOR)
+        assertNotNull(respuesta.getCodigoConsulta());
+        assertEquals(32, respuesta.getCodigoConsulta().length());
+        assertFalse(respuesta.getCodigoConsulta().contains("-"));
+    }
+
+    @Test
+    void obtenerPorCodigoEncuentraElPedidoYDevuelveVacioSiNoExiste() {
+        Pedido existente = new Pedido();
+        existente.setId(9L);
+        existente.setCliente("Catherine");
+        existente.setEmail("catherine@ejemplo.cl");
+        existente.setTotal(5000);
+        existente.setCodigoConsulta("abc123xyz");
+        when(pedidoRepository.findByCodigoConsulta(anyString())).thenReturn(Optional.empty());
+        when(pedidoRepository.findByCodigoConsulta("abc123xyz")).thenReturn(Optional.of(existente));
+
+        Optional<PedidoResponse> encontrada = pedidoService.obtenerPorCodigo("abc123xyz");
+        assertTrue(encontrada.isPresent());
+        assertEquals("abc123xyz", encontrada.get().getCodigoConsulta());
+
+        assertTrue(pedidoService.obtenerPorCodigo("otro-codigo").isEmpty());
+        assertTrue(pedidoService.obtenerPorCodigo("   ").isEmpty());
+        assertTrue(pedidoService.obtenerPorCodigo(null).isEmpty());
+    }
+
+    @Test
     void registrarPersisteElPedidoConElTotalCalculado() {
         alPersistirAsignarId(1L);
 

@@ -33,7 +33,16 @@ public class PedidoController {
         }
     }
 
-    // Consultar un pedido por su id (lo usa el frontend y la verificación)
+    // Consulta publica por el codigo opaco de seguimiento (RF-11).
+    // Este es el UNICO punto de lectura sin API key: el id secuencial ya no se expone.
+    @GetMapping("/seguimiento/{codigo}")
+    public ResponseEntity<PedidoResponse> consultarPorCodigo(@PathVariable String codigo) {
+        return pedidoService.obtenerPorCodigo(codigo)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    // Consultar un pedido por id (uso interno/administrativo: requiere header X-Api-Key)
     @GetMapping("/{id}")
     public ResponseEntity<PedidoResponse> obtenerPedido(@PathVariable Long id) {
         return pedidoService.obtener(id)
@@ -41,13 +50,13 @@ public class PedidoController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    // Listar los pedidos, los más recientes primero
+    // Listar los pedidos, los más recientes primero (uso administrativo: requiere X-Api-Key)
     @GetMapping
     public List<PedidoResponse> listarPedidos() {
         return pedidoService.listar();
     }
 
-    // Cambiar el estado de un pedido (RF-11)
+    // Cambiar el estado de un pedido (RF-11) — uso administrativo: requiere X-Api-Key
     @PatchMapping("/{id}/estado")
     public ResponseEntity<?> cambiarEstadoPedido(@PathVariable Long id, @RequestBody Map<String, String> cuerpo) {
         try {

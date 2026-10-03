@@ -34,6 +34,11 @@ public class Pedido {
     @Column(nullable = false)
     private String estado = "RECIBIDO";
 
+    // Codigo opaco de seguimiento (UUID sin guiones): la consulta publica usa este
+    // codigo y NO el id secuencial, asi nadie puede adivinar pedidos ajenos (IDOR)
+    @Column(unique = true)
+    private String codigoConsulta;
+
     // Detalle del pedido: se crea y borra junto con el pedido padre
     @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<PedidoItem> items = new ArrayList<>();

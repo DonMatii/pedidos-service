@@ -16,6 +16,9 @@ public class PedidoResponse {
     private Integer total;
     // Estado actual del pedido que devuelven los endpoints (RF-11)
     private String estado;
+
+    // Codigo opaco de seguimiento para la consulta publica (RF-11)
+    private String codigoConsulta;
     private List<ProductoResponse> productos;
     // true cuando el evento PedidoCreado fue confirmado por Kafka (T5)
     private boolean eventoPublicado;
