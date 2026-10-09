@@ -134,7 +134,7 @@ public class PedidoService {
                 pedido.getId(),
                 pedido.getCliente(),
                 pedido.getEmail(),
-                pedido.getItems().stream().map(PedidoItem::getNombre).collect(Collectors.joining(", ")),
+                pedido.getItems().stream().map(i -> i.getNombre() + " x" + i.getCantidad()).collect(Collectors.joining(", ")),
                 pedido.getItems().stream().mapToInt(PedidoItem::getCantidad).sum(),
                 pedido.getTotal(),
                 pedido.getFecha(),
