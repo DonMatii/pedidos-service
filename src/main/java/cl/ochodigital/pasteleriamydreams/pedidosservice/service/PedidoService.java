@@ -137,7 +137,8 @@ public class PedidoService {
                 pedido.getItems().stream().map(PedidoItem::getNombre).collect(Collectors.joining(", ")),
                 pedido.getItems().stream().mapToInt(PedidoItem::getCantidad).sum(),
                 pedido.getTotal(),
-                pedido.getFecha()
+                pedido.getFecha(),
+                pedido.getCodigoConsulta()
         );
 
         try {

@@ -124,6 +124,23 @@ class PedidoServiceTest {
     }
 
     @Test
+    void registrarPublicaElCodigoDeConsultaOpacoEnElEvento() {
+        alPersistirAsignarId(42L);
+
+        PedidoResponse respuesta = pedidoService.registrar(solicitudValida());
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(kafkaTemplate).send(eq("pedidos"), captor.capture());
+
+        // RF-11: el evento lleva el codigo opaco para que notificaciones-service
+        // pueda persistirlo y mostrarlo en el correo de confirmacion (RF-09)
+        String json = captor.getValue();
+        assertNotNull(respuesta.getCodigoConsulta());
+        assertTrue(json.contains("\"codigoConsulta\":\"" + respuesta.getCodigoConsulta() + "\""),
+                "El evento debe publicar el codigoConsulta del pedido: " + json);
+    }
+
+    @Test
     void registrarRespondeEventoNoPublicadoSiKafkaFallaPeroElPedidoQuedaGuardado() {
         alPersistirAsignarId(11L);
         CompletableFuture<SendResult<String, String>> falla = new CompletableFuture<>();
