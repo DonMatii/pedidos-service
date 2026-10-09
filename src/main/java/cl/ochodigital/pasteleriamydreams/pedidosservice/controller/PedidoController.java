@@ -13,7 +13,10 @@ import java.util.Map;
 // Endpoints REST de pedidos (RF-07)
 @RestController
 @RequestMapping("/api/pedidos")
-@CrossOrigin(origins = {"http://localhost:5173"})
+@CrossOrigin(origins = {
+        "http://localhost:5173",
+        "http://pasteleria-my-dreams-web-8digital.s3-website-us-east-1.amazonaws.com"
+})
 public class PedidoController {
 
     private final PedidoService pedidoService;
