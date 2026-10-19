@@ -32,7 +32,7 @@ Diseñado y construido por **8 Digital**.
 | `GET` | `/api/pedidos/{id}` | Consulta un pedido por su id (devuelve `404` si no existe). |
 | `PATCH` | `/api/pedidos/{id}/estado` | Cambia el estado de un pedido (RF-11): `200` actualizado, `400` si el estado no es válido, `404` si no existe. |
 
-CORS está abierto solo para el frontend local `http://localhost:5173`.
+CORS está abierto para dos orígenes: el frontend local `http://localhost:5173` y el sitio público desplegado en S3 (`http://pasteleria-my-dreams-web-8digital.s3-website-us-east-1.amazonaws.com`).
 
 ### POST /api/pedidos
 
@@ -110,7 +110,7 @@ Topic: `pedidos` (configurable con `app.kafka.topic`). El payload es un JSON ser
 }
 ```
 
-Campos del record `PedidoCreadoEvent`: `evento`, `id`, `cliente`, `email`, `producto`, `cantidad`, `total`, `fecha`. Nota: `producto` es la lista de nombres de los items unida por `", "` y `cantidad` es la suma de las cantidades de todos los items.
+Campos del record `PedidoCreadoEvent`: `evento`, `id`, `cliente`, `email`, `producto`, `cantidad`, `total`, `fecha`, `codigoConsulta`. Nota: `producto` une cada item como `"{nombre} x{cantidad}"` separados por `", "` (ej: `Selva Negra x2, Manjar Nuez x8`), `cantidad` es la suma de las cantidades de todos los items y `codigoConsulta` es el código opaco de seguimiento (RF-11).
 
 ### Persistir antes de publicar (RNF-08)
 
