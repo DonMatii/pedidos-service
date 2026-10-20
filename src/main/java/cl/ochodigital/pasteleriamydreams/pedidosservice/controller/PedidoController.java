@@ -36,6 +36,16 @@ public class PedidoController {
         }
     }
 
+    // Elegibilidad del codigo de bienvenida para un email (uso publico del frontend):
+    // responde { "elegible": true|false }. El frontend lo consulta antes de mostrar
+    // el banner/prellenado, para no prometer un descuento que el backend rechazaria.
+    // Sin API key a proposito: solo expone si un email ainda puede canjear, nada mas.
+    @GetMapping("/bienvenida/estado")
+    public ResponseEntity<Map<String, Boolean>> elegibilidadBienvenida(
+            @RequestParam("email") String email) {
+        return ResponseEntity.ok(Map.of("elegible", pedidoService.elegibleParaBienvenida(email)));
+    }
+
     // Consulta publica por el codigo opaco de seguimiento (RF-11).
     // Este es el UNICO punto de lectura sin API key: el id secuencial ya no se expone.
     @GetMapping("/seguimiento/{codigo}")

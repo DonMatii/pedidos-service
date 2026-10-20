@@ -15,7 +15,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 
 // Protege los endpoints administrativos de /api/pedidos con una API key (header X-Api-Key).
-// Publico sin key: POST /api/pedidos (crear pedido) y GET /api/pedidos/seguimiento/{codigo}.
+// Publico sin key: POST /api/pedidos (crear pedido), GET /api/pedidos/seguimiento/{codigo}
+// y GET /api/pedidos/bienvenida/estado (elegibilidad del descuento de bienvenida).
 // El valor viene de la variable de entorno app.admin-api-key / APP_ADMIN_API_KEY (RNF-11:
 // la config vive en el entorno, nunca en el codigo). Si la key no esta configurada,
 // los endpoints protegidos responden 503 (fail-closed) en vez de quedar abiertos.
@@ -46,7 +47,10 @@ public class AdminApiKeyFilter extends OncePerRequestFilter {
         }
 
         boolean esPublico = ("POST".equalsIgnoreCase(metodo) && ruta.equals(RUTA_API))
-                || ("GET".equalsIgnoreCase(metodo) && ruta.startsWith(RUTA_API + "/seguimiento/"));
+                || ("GET".equalsIgnoreCase(metodo) && ruta.startsWith(RUTA_API + "/seguimiento/"))
+                // Elegibilidad de BIENVENIDO10: consulta liviana del frontend para no
+                // prometer un descuento ya canjeado. Solo devuelve { elegible: bool }.
+                || ("GET".equalsIgnoreCase(metodo) && ruta.equals(RUTA_API + "/bienvenida/estado"));
         if (esPublico) {
             chain.doFilter(request, response);
             return;

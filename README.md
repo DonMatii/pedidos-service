@@ -31,6 +31,7 @@ Diseñado y construido por **8 Digital**.
 | `GET` | `/api/pedidos` | Lista todos los pedidos, los más recientes primero. |
 | `GET` | `/api/pedidos/{id}` | Consulta un pedido por su id (devuelve `404` si no existe). |
 | `PATCH` | `/api/pedidos/{id}/estado` | Cambia el estado de un pedido (RF-11): `200` actualizado, `400` si el estado no es válido, `404` si no existe. |
+| `GET` | `/api/pedidos/bienvenida/estado` | Consulta pública la elegibilidad del código `BIENVENIDO10` para un email: `{ "elegible": true \| false }`. El frontend la usa antes de prometer el descuento. |
 
 CORS está abierto para dos orígenes: el frontend local `http://localhost:5173` y el sitio público desplegado en S3 (`http://pasteleria-my-dreams-web-8digital.s3-website-us-east-1.amazonaws.com`).
 
@@ -202,7 +203,7 @@ Kafka topic `pedidos`
 
 ## Seguridad (v2)
 
-- **Públicos sin autenticación:** `POST /api/pedidos` (crear pedido) y `GET /api/pedidos/seguimiento/{codigo}` (consulta pública RF-11).
+- **Públicos sin autenticación:** `POST /api/pedidos` (crear pedido), `GET /api/pedidos/seguimiento/{codigo}` (consulta pública RF-11) y `GET /api/pedidos/bienvenida/estado` (elegibilidad del código de bienvenida).
 - **Protegidos con header `X-Api-Key`:** `GET /api/pedidos` (listado), `GET /api/pedidos/{id}` y `PATCH /api/pedidos/{id}/estado`.
 - La clave se configura en la variable de entorno `APP_ADMIN_API_KEY` (propiedad `app.admin-api-key`). Si no está definida, los endpoints protegidos responden `503` (fail-closed: nunca quedan abiertos por omisión).
 - **Protección IDOR:** al registrar un pedido se genera un *código de seguimiento* opaco (UUID de 32 caracteres) que se devuelve en la respuesta del `POST`. La consulta pública usa ese código y **nunca** el id secuencial, de modo que no es posible adivinar pedidos de otros clientes.
@@ -212,6 +213,7 @@ Kafka topic `pedidos`
 - `POST /api/pedidos` acepta el campo opcional `codigoDescuento`. Con el código `BIENVENIDO10` aplica **-10%** sobre la suma de los items: el pedido persiste `codigoDescuento`, `descuento` y `total = subtotal - descuento` en la base de datos.
 - Códigos desconocidos se rechazan con `400` y mensaje de error.
 - **Uso único por email:** si el mismo email intenta canjear `BIENVENIDO10` una segunda vez, el backend responde `400` con `El código de descuento ya fue canjeado para este email`. Cada cliente nuevo (otro email) puede usarlo una vez.
+- **Elegibilidad consultable:** `GET /api/pedidos/bienvenida/estado?email=...` devuelve `{ "elegible": true }` si ese email todavía puede canjear el código, o `false` si ya lo usó. El frontend lo consulta antes de mostrar el banner / prellenar, para no prometer un descuento que el backend rechazaría. Es la misma regla de uso único, expuesta como consulta; no requiere API key.
 - El frontend entrega el código solo la **primera vez** que un cliente inicia sesión (bandera en `localStorage`), lo muestra en el Home, lo aplica en la página de pedido y lo consume tras el registro. El backend valida y persiste.
 - La consulta pública `GET /api/pedidos/seguimiento/{codigo}` refleja el total con descuento.
 

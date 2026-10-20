@@ -127,4 +127,40 @@ class PedidoDescuentoIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.descuento").value(1000));
     }
+
+    @Test
+    void elegibilidadBienvenidaReflejaUsoUnicoPorEmail() throws Exception {
+        // Email que nunca canjeo el codigo: el backend lo confirma como elegible
+        mockMvc.perform(get("/api/pedidos/bienvenida/estado")
+                        .param("email", "nunca-canjeo@ejemplo.cl"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.elegible").value(true));
+
+        // Ese email canjea el codigo en un pedido real
+        mockMvc.perform(post("/api/pedidos")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cliente\":\"Ya Canjeo\",\"email\":\"ya-canjeo@ejemplo.cl\","
+                                + "\"codigoDescuento\":\"BIENVENIDO10\","
+                                + "\"productos\":[{\"nombre\":\"Torta\",\"cantidad\":1,\"precioUnitario\":10000}]}"))
+                .andExpect(status().isCreated());
+
+        // Tras canjear, ese MISMO email deja de ser elegible (uso unico)
+        mockMvc.perform(get("/api/pedidos/bienvenida/estado")
+                        .param("email", "ya-canjeo@ejemplo.cl"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.elegible").value(false));
+
+        // Otro email distinto sigue siendo elegible: el codigo no es global
+        mockMvc.perform(get("/api/pedidos/bienvenida/estado")
+                        .param("email", "otro-cliente@ejemplo.cl"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.elegible").value(true));
+    }
+
+    @Test
+    void elegibilidadSinEmailResponde400() throws Exception {
+        // Sin email no hay forma de saber si puede canjear: se rechaza, no se adivina
+        mockMvc.perform(get("/api/pedidos/bienvenida/estado"))
+                .andExpect(status().isBadRequest());
+    }
 }

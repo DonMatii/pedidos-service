@@ -236,6 +236,18 @@ public class PedidoService {
         }
     }
 
+    // Elegibilidad del codigo de bienvenida para un email (feedback de demo):
+    // el frontend pregunta aqui ANTES de prometer el descuento, para no mostrar
+    // un "codigo trampa" a quien ya lo canjeo. Es la MISMA regla de uso unico que
+    // validar(), pero expuesta como consulta para que el navegador no decida solo.
+    // Publico sin API key: solo devuelve un booleano, no expone datos del pedido.
+    public boolean elegibleParaBienvenida(String email) {
+        if (email == null || email.isBlank()) {
+            return false;
+        }
+        return !pedidoRepository.existsByEmailIgnoreCaseAndCodigoDescuento(email.trim(), CODIGO_BIENVENIDO);
+    }
+
     // Convierte la entidad en la respuesta que se devuelve al cliente
     private PedidoResponse armarRespuesta(Pedido pedido, boolean eventoPublicado) {
         PedidoResponse respuesta = new PedidoResponse();
