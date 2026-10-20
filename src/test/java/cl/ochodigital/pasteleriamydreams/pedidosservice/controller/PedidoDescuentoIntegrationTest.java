@@ -1,11 +1,13 @@
 package cl.ochodigital.pasteleriamydreams.pedidosservice.controller;
 
+import cl.ochodigital.pasteleriamydreams.pedidosservice.client.DeliciaClient;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.repository.PedidoRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -26,6 +28,11 @@ class PedidoDescuentoIntegrationTest {
 
     @Autowired
     private PedidoRepository pedidoRepository;
+
+    // Estas pruebas cubren BIENVENIDO10, no la delicia: el cliente de catálogo se
+    // mockea vacío para que la suite siga siendo hermética (sin red hacia 8080)
+    @MockBean
+    private DeliciaClient deliciaClient;
 
     @BeforeEach
     void limpiar() {

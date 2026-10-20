@@ -1,5 +1,6 @@
 package cl.ochodigital.pasteleriamydreams.pedidosservice.service;
 
+import cl.ochodigital.pasteleriamydreams.pedidosservice.client.DeliciaClient;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.dto.PedidoRequest;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.dto.PedidoResponse;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.repository.PedidoRepository;
@@ -9,6 +10,7 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.test.EmbeddedKafkaBroker;
@@ -43,6 +45,10 @@ class PedidoPublicacionIntegrationTest {
 
     @Autowired
     private EmbeddedKafkaBroker embeddedKafka;
+
+    // El cliente de catálogo se mockea vacío: esta prueba verifica persistencia + Kafka
+    @MockBean
+    private DeliciaClient deliciaClient;
 
     @Test
     void persisteElPedidoAntesDePublicarElEvento() {

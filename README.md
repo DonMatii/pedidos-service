@@ -156,6 +156,7 @@ La conexión a la base de datos se configura por variables de entorno, con defau
 | `DB_URL` | `jdbc:mysql://localhost:3306/pasteleria_my_dreams?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC` |
 | `DB_USER` | `root` |
 | `DB_PASS` | *(vacío)* |
+| `CATALOGO_URL` | `http://localhost:8080` (base de catalogo-service para consultar la Delicia del Día) |
 
 Otras propiedades relevantes (`src/main/resources/application.properties`):
 
@@ -164,6 +165,7 @@ Otras propiedades relevantes (`src/main/resources/application.properties`):
 | `server.port` | `8082` |
 | `spring.kafka.bootstrap-servers` | `localhost:9092` |
 | `app.kafka.topic` | `pedidos` |
+| `app.catalogo.base-url` | `${CATALOGO_URL:http://localhost:8080}` (URL de catalogo-service) |
 | `spring.jpa.hibernate.ddl-auto` | `update` (crea/actualiza `pedidos` y `pedido_items` al arrancar) |
 
 ## ▶️ Cómo correrlo local
@@ -212,3 +214,13 @@ Kafka topic `pedidos`
 - **Uso único por email:** si el mismo email intenta canjear `BIENVENIDO10` una segunda vez, el backend responde `400` con `El código de descuento ya fue canjeado para este email`. Cada cliente nuevo (otro email) puede usarlo una vez.
 - El frontend entrega el código solo la **primera vez** que un cliente inicia sesión (bandera en `localStorage`), lo muestra en el Home, lo aplica en la página de pedido y lo consume tras el registro. El backend valida y persiste.
 - La consulta pública `GET /api/pedidos/seguimiento/{codigo}` refleja el total con descuento.
+
+## Descuento de la Delicia del Día (v3)
+
+- **Automático y sin código:** si el pedido incluye el producto que catálogo-service declara como Delicia del Día (`GET /api/productos/delicia-del-dia`), se aplica **-10% sobre el subtotal completo del pedido**, una sola vez por transacción. Agregar más unidades del producto destacado no multiplica ni encadena el descuento.
+- **Coincidencia por nombre:** el backend compara el `nombre` de cada item con el de la delicia usando `trim()` + `equalsIgnoreCase`.
+- **Se acumula con `BIENVENIDO10`:** si el pedido tiene ambos descuentos, `descuento` persiste la suma de los dos y el total es `subtotal - bienvenida - delicia` (hasta -20%). El campo `codigoDescuento` sigue siendo exactamente `BIENVENIDO10` o `null`, por lo que la unicidad por email no cambia.
+- **Sin límite de uso:** cada pedido que incluya la delicia recibe el descuento (varios pedidos el mismo día, todos lo aplican).
+- **Fail-open:** la consulta a catalogo-service usa un timeout de 2 segundos; si el catálogo no responde (404, error o sin conexión), el pedido se crea igual y simplemente no recibe este descuento. Nunca bloquea la creación del pedido.
+- **La delicia la decide catalogo-service** (misma para todos los usuarios por fecha, sin repetir dentro de la semana): este servicio solo la consulta vía `app.catalogo.base-url` / `CATALOGO_URL`.
+- Los tests lo cubren con `DeliciaClientTest` (cliente con `MockRestServiceServer`), `PedidoServiceTest` y `PedidoDeliciaIntegrationTest` (stack completo con el cliente mockeado).

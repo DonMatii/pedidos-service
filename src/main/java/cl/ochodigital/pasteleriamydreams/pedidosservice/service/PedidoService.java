@@ -1,5 +1,6 @@
 package cl.ochodigital.pasteleriamydreams.pedidosservice.service;
 
+import cl.ochodigital.pasteleriamydreams.pedidosservice.client.DeliciaClient;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.dto.PedidoRequest;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.dto.PedidoResponse;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.event.PedidoCreadoEvent;
@@ -37,19 +38,26 @@ public class PedidoService {
     public static final String CODIGO_BIENVENIDO = "BIENVENIDO10";
     private static final int PORCENTAJE_BIENVENIDO = 10;
 
+    // Delicia del Día: -10% sobre el subtotal completo si el pedido la incluye (S2)
+    private static final int PORCENTAJE_DELICIA = 10;
+
     private final PedidoRepository pedidoRepository;
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
+    private final DeliciaClient deliciaClient;
     private final String topicoPedidos;
 
-    // Inyectamos el repositorio (H2 en tests, MySQL/RDS en runtime) y el productor de Kafka
+    // Inyectamos el repositorio (H2 en tests, MySQL/RDS en runtime), el productor de
+    // Kafka y el cliente de catalogo-service para consultar la Delicia del Día
     public PedidoService(PedidoRepository pedidoRepository,
                          KafkaTemplate<String, String> kafkaTemplate,
                          ObjectMapper objectMapper,
+                         DeliciaClient deliciaClient,
                          @Value("${app.kafka.topic}") String topicoPedidos) {
         this.pedidoRepository = pedidoRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
+        this.deliciaClient = deliciaClient;
         this.topicoPedidos = topicoPedidos;
     }
 
@@ -78,10 +86,14 @@ public class PedidoService {
         String codigo = (solicitud.getCodigoDescuento() == null || solicitud.getCodigoDescuento().isBlank())
                 ? null
                 : CODIGO_BIENVENIDO;
-        int descuento = (codigo != null) ? subtotal * PORCENTAJE_BIENVENIDO / 100 : 0;
+        int descuentoBienvenida = (codigo != null) ? subtotal * PORCENTAJE_BIENVENIDO / 100 : 0;
+        // Delicia del Día: -10% sobre el subtotal, una sola vez por transacción (S2).
+        // El total pasa a ser subtotal - bienvenida - delicia; la columna `descuento`
+        // persiste la suma de ambos (sin cambios de esquema)
+        int descuentoDelicia = descuentoDelicia(solicitud.getProductos(), subtotal);
         pedido.setCodigoDescuento(codigo);
-        pedido.setDescuento(descuento);
-        pedido.setTotal(subtotal - descuento);
+        pedido.setDescuento(descuentoBienvenida + descuentoDelicia);
+        pedido.setTotal(subtotal - descuentoBienvenida - descuentoDelicia);
 
         // 1) Primero se persiste: el pedido nunca se pierde aunque Kafka falle
         Pedido guardado = pedidoRepository.save(pedido);
@@ -125,6 +137,33 @@ public class PedidoService {
         actualizado.setEstado(estado);
         Pedido guardado = pedidoRepository.save(actualizado);
         return Optional.of(armarRespuesta(guardado, false));
+    }
+
+    // Delicia del Día: -10% sobre el subtotal completo, una sola vez por transacción,
+    // solo si algún item del pedido coincide con la delicia de hoy (match por nombre,
+    // trim() + equalsIgnoreCase). Fail-open: si catalogo-service no responde, el pedido
+    // se crea igual y simplemente no recibe este descuento.
+    private int descuentoDelicia(List<PedidoRequest.ProductoRequest> productos, int subtotal) {
+        String delicia;
+        try {
+            delicia = deliciaClient.obtenerNombreDelicia().orElse(null);
+        } catch (Exception e) {
+            log.warn("Fallo inesperado al consultar la delicia del día: el pedido sigue sin ese descuento ({})",
+                    e.getMessage());
+            return 0;
+        }
+        if (delicia == null) {
+            return 0;
+        }
+        String buscada = delicia.trim();
+        boolean incluyeLaDelicia = productos.stream().anyMatch(producto ->
+                producto.getNombre() != null && buscada.equalsIgnoreCase(producto.getNombre().trim()));
+        if (!incluyeLaDelicia) {
+            return 0;
+        }
+        int descuento = subtotal * PORCENTAJE_DELICIA / 100;
+        log.info("El pedido incluye la Delicia del Día '{}': -10% sobre el subtotal ({})", delicia, descuento);
+        return descuento;
     }
 
     // Publica PedidoCreado y devuelve true solo si el broker confirmó a tiempo

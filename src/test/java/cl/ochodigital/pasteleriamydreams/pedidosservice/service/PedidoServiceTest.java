@@ -1,5 +1,6 @@
 package cl.ochodigital.pasteleriamydreams.pedidosservice.service;
 
+import cl.ochodigital.pasteleriamydreams.pedidosservice.client.DeliciaClient;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.dto.PedidoRequest;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.dto.PedidoResponse;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.model.Pedido;
@@ -28,14 +29,19 @@ class PedidoServiceTest {
 
     private PedidoRepository pedidoRepository;
     private KafkaTemplate<String, String> kafkaTemplate;
+    private DeliciaClient deliciaClient;
     private PedidoService pedidoService;
 
     @BeforeEach
     void preparar() {
         pedidoRepository = mock(PedidoRepository.class);
         kafkaTemplate = mock(KafkaTemplate.class);
+        deliciaClient = mock(DeliciaClient.class);
         ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
-        pedidoService = new PedidoService(pedidoRepository, kafkaTemplate, objectMapper, "pedidos");
+        pedidoService = new PedidoService(pedidoRepository, kafkaTemplate, objectMapper, deliciaClient, "pedidos");
+
+        // Sin delicia del día por omisión: los tests previos conservan su comportamiento
+        when(deliciaClient.obtenerNombreDelicia()).thenReturn(Optional.empty());
 
         // El broker confirma la publicación en los casos donde el pedido es válido
         when(kafkaTemplate.send(anyString(), anyString()))
@@ -119,7 +125,8 @@ class PedidoServiceTest {
         String json = captor.getValue();
         assertTrue(json.contains("\"evento\":\"PedidoCreado\""));
         assertTrue(json.contains("\"id\":42"));
-        assertTrue(json.contains("Torta de chocolate, Cupcakes vainilla"));
+        // El evento publica cada item como "{nombre} x{cantidad}" (fix 601b774)
+        assertTrue(json.contains("Torta de chocolate x1, Cupcakes vainilla x6"));
         assertTrue(json.contains("\"cantidad\":7"));
     }
 
@@ -322,6 +329,84 @@ class PedidoServiceTest {
 
         assertEquals(3399, respuesta.getDescuento());
         assertEquals("BIENVENIDO10", respuesta.getCodigoDescuento());
+    }
+
+    @Test
+    void registrarAplicaDiezPorCientoDeDeliciaCuandoElPedidoIncluyeLaDeliciaDeHoy() {
+        alPersistirAsignarId(7L);
+        when(deliciaClient.obtenerNombreDelicia()).thenReturn(Optional.of("Torta de chocolate"));
+
+        PedidoResponse respuesta = pedidoService.registrar(solicitudValida());
+
+        assertEquals(33990, respuesta.getSubtotal());
+        assertEquals(3399, respuesta.getDescuento());
+        assertEquals(30591, respuesta.getTotal());
+        assertNull(respuesta.getCodigoDescuento());
+    }
+
+    @Test
+    void registrarAcumulaElDescuentoDeDeliciaConElDeBienvenida() {
+        alPersistirAsignarId(7L);
+        when(deliciaClient.obtenerNombreDelicia()).thenReturn(Optional.of("Torta de chocolate"));
+        PedidoRequest solicitud = solicitudValida();
+        solicitud.setCodigoDescuento("BIENVENIDO10");
+
+        PedidoResponse respuesta = pedidoService.registrar(solicitud);
+
+        // Con ambos descuentos el total es el subtotal menos 20%
+        assertEquals(33990, respuesta.getSubtotal());
+        assertEquals(6798, respuesta.getDescuento());
+        assertEquals(27192, respuesta.getTotal());
+        assertEquals("BIENVENIDO10", respuesta.getCodigoDescuento());
+    }
+
+    @Test
+    void registrarSinLaDeliciaDeHoyNoAplicaDescuentoDeDelicia() {
+        alPersistirAsignarId(7L);
+        when(deliciaClient.obtenerNombreDelicia()).thenReturn(Optional.of("Torta selva negra"));
+
+        PedidoResponse respuesta = pedidoService.registrar(solicitudValida());
+
+        assertEquals(0, respuesta.getDescuento());
+        assertEquals(33990, respuesta.getTotal());
+    }
+
+    @Test
+    void registrarAplicaElDescuentoDeDeliciaUnaSolaVezConVariasUnidades() {
+        alPersistirAsignarId(7L);
+        when(deliciaClient.obtenerNombreDelicia()).thenReturn(Optional.of("Cupcakes vainilla"));
+
+        PedidoResponse respuesta = pedidoService.registrar(solicitudValida());
+
+        // 6 unidades del destacado: el -10% es sobre el subtotal completo, una sola vez
+        assertEquals(3399, respuesta.getDescuento());
+        assertEquals(30591, respuesta.getTotal());
+    }
+
+    @Test
+    void registrarCreaElPedidoAunqueCatalogoServiceNoResponda() {
+        alPersistirAsignarId(9L);
+        // Fail-open: el cliente de catálogo revienta y el pedido se crea igual, sin ese descuento
+        when(deliciaClient.obtenerNombreDelicia()).thenThrow(new RuntimeException("catalogo caído"));
+
+        PedidoResponse respuesta = pedidoService.registrar(solicitudValida());
+
+        assertEquals(33990, respuesta.getTotal());
+        assertEquals(0, respuesta.getDescuento());
+        assertNull(respuesta.getCodigoDescuento());
+        verify(pedidoRepository).save(any(Pedido.class));
+        assertTrue(respuesta.isEventoPublicado());
+    }
+
+    @Test
+    void registrarMatcheaLaDeliciaIgnorandoMayusculasYSobrantesDeEspacios() {
+        alPersistirAsignarId(7L);
+        when(deliciaClient.obtenerNombreDelicia()).thenReturn(Optional.of("  tOrTa dE cHoCoLaTe  "));
+
+        PedidoResponse respuesta = pedidoService.registrar(solicitudValida());
+
+        assertEquals(3399, respuesta.getDescuento());
+        assertEquals(30591, respuesta.getTotal());
     }
 
     // El repositorio devuelve el pedido con su id generado
