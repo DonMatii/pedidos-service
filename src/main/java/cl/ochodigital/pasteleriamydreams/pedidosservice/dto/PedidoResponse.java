@@ -23,6 +23,10 @@ public class PedidoResponse {
     private Integer subtotal;
     private String codigoDescuento;
     private Integer descuento;
+    // Desglose informativo del descuento: su suma es exactamente `descuento`.
+    // La entidad persiste solo la suma, sin cambios de esquema.
+    private Integer descuentoBienvenida;
+    private Integer descuentoDelicia;
     private List<ProductoResponse> productos;
     // true cuando el evento PedidoCreado fue confirmado por Kafka (T5)
     private boolean eventoPublicado;

@@ -290,6 +290,9 @@ class PedidoServiceTest {
         assertEquals(3399, respuesta.getDescuento());
         assertEquals(30591, respuesta.getTotal());
         assertEquals("BIENVENIDO10", respuesta.getCodigoDescuento());
+        // El desglose le dice al cliente qué descuento es cuál
+        assertEquals(3399, respuesta.getDescuentoBienvenida());
+        assertEquals(0, respuesta.getDescuentoDelicia());
     }
 
     @Test
@@ -342,6 +345,9 @@ class PedidoServiceTest {
         assertEquals(3399, respuesta.getDescuento());
         assertEquals(30591, respuesta.getTotal());
         assertNull(respuesta.getCodigoDescuento());
+        // Sin codigo de bienvenida todo el descuento es de la Delicia del Día
+        assertEquals(0, respuesta.getDescuentoBienvenida());
+        assertEquals(3399, respuesta.getDescuentoDelicia());
     }
 
     @Test
@@ -358,6 +364,9 @@ class PedidoServiceTest {
         assertEquals(6798, respuesta.getDescuento());
         assertEquals(27192, respuesta.getTotal());
         assertEquals("BIENVENIDO10", respuesta.getCodigoDescuento());
+        // Cada parte queda separada para que el cliente la nombre bien
+        assertEquals(3399, respuesta.getDescuentoBienvenida());
+        assertEquals(3399, respuesta.getDescuentoDelicia());
     }
 
     @Test

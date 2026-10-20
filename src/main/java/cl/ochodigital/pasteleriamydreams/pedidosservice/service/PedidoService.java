@@ -244,9 +244,17 @@ public class PedidoService {
         respuesta.setEmail(pedido.getEmail());
         respuesta.setFecha(pedido.getFecha());
         int descuento = pedido.getDescuento() == null ? 0 : pedido.getDescuento();
+        int subtotal = pedido.getTotal() + descuento;
+        // Desglose: la bienvenida es exactamente el 10% del subtotal solo si el
+        // pedido canjeó el código; lo que resta corresponde a la Delicia del Día
+        int bienvenida = (pedido.getCodigoDescuento() != null)
+                ? subtotal * PORCENTAJE_BIENVENIDO / 100
+                : 0;
         respuesta.setTotal(pedido.getTotal());
-        respuesta.setSubtotal(pedido.getTotal() + descuento);
+        respuesta.setSubtotal(subtotal);
         respuesta.setDescuento(descuento);
+        respuesta.setDescuentoBienvenida(bienvenida);
+        respuesta.setDescuentoDelicia(descuento - bienvenida);
         respuesta.setCodigoDescuento(pedido.getCodigoDescuento());
         respuesta.setEstado(pedido.getEstado());
         respuesta.setCodigoConsulta(pedido.getCodigoConsulta());
