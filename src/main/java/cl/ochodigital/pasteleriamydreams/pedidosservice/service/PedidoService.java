@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
@@ -123,6 +124,14 @@ public class PedidoService {
         return pedidoRepository.findAllByOrderByIdDesc().stream()
                 .map(pedido -> armarRespuesta(pedido, false))
                 .toList();
+    }
+
+    // Agrega por producto las unidades y el monto vendidos en un rango de fechas (S3):
+    // alimenta la seccion "que se vendio" del dashboard de administracion
+    public List<PedidoRepository.VentasPorProducto> ventasPorProducto(LocalDate desde, LocalDate hasta) {
+        // El filtro es [desde 00:00, hasta+1 00:00): inclusivo de inicio, exclusivo de fin,
+        // para que "hasta = hoy" incluya los pedidos de hoy enteros (fecha es LocalDateTime)
+        return pedidoRepository.buscarVentasPorProducto(desde.atStartOfDay(), hasta.plusDays(1).atStartOfDay());
     }
 
     // Cambia el estado de un pedido, lo persiste y devuelve la respuesta actualizada (RF-11)

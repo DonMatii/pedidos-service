@@ -2,11 +2,14 @@ package cl.ochodigital.pasteleriamydreams.pedidosservice.controller;
 
 import cl.ochodigital.pasteleriamydreams.pedidosservice.dto.PedidoRequest;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.dto.PedidoResponse;
+import cl.ochodigital.pasteleriamydreams.pedidosservice.repository.PedidoRepository;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.service.PedidoService;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -67,6 +70,15 @@ public class PedidoController {
     @GetMapping
     public List<PedidoResponse> listarPedidos() {
         return pedidoService.listar();
+    }
+
+    // Que se vendio en un rango de fechas: unidades y monto por producto, de mas a menos
+    // vendido (S3, dashboard de administracion). Uso administrativo: requiere X-Api-Key
+    @GetMapping("/estadisticas/productos")
+    public List<PedidoRepository.VentasPorProducto> ventasPorProducto(
+            @RequestParam("desde") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam("hasta") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta) {
+        return pedidoService.ventasPorProducto(desde, hasta);
     }
 
     // Cambiar el estado de un pedido (RF-11) — uso administrativo: requiere X-Api-Key

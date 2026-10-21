@@ -32,6 +32,7 @@ Diseñado y construido por **8 Digital**.
 | `GET` | `/api/pedidos/{id}` | Consulta un pedido por su id (devuelve `404` si no existe). |
 | `PATCH` | `/api/pedidos/{id}/estado` | Cambia el estado de un pedido (RF-11): `200` actualizado, `400` si el estado no es válido, `404` si no existe. |
 | `GET` | `/api/pedidos/bienvenida/estado` | Consulta pública la elegibilidad del código `BIENVENIDO10` para un email: `{ "elegible": true \| false }`. El frontend la usa antes de prometer el descuento. |
+| `GET` | `/api/pedidos/estadisticas/productos?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` | Qué se vendió en un rango de fechas: lista de `{ nombre, unidades, monto }` por producto, de más a menos vendido. Alimenta el dashboard de administración (S3). Requiere `X-Api-Key`. |
 
 CORS está abierto para dos orígenes: el frontend local `http://localhost:5173` y el sitio público desplegado en S3 (`http://pasteleria-my-dreams-web-8digital.s3-website-us-east-1.amazonaws.com`).
 
@@ -205,7 +206,7 @@ Kafka topic `pedidos`
 ## Seguridad (v2)
 
 - **Públicos sin autenticación:** `POST /api/pedidos` (crear pedido), `GET /api/pedidos/seguimiento/{codigo}` (consulta pública RF-11) y `GET /api/pedidos/bienvenida/estado` (elegibilidad del código de bienvenida).
-- **Protegidos con header `X-Api-Key`:** `GET /api/pedidos` (listado), `GET /api/pedidos/{id}` y `PATCH /api/pedidos/{id}/estado`.
+- **Protegidos con header `X-Api-Key`:** `GET /api/pedidos` (listado), `GET /api/pedidos/{id}`, `PATCH /api/pedidos/{id}/estado` y `GET /api/pedidos/estadisticas/productos` (unidades por producto del dashboard).
 - La clave se configura en la variable de entorno `APP_ADMIN_API_KEY` (propiedad `app.admin-api-key`). Si no está definida, los endpoints protegidos responden `503` (fail-closed: nunca quedan abiertos por omisión).
 - **Protección IDOR:** al registrar un pedido se genera un *código de seguimiento* opaco (UUID de 32 caracteres) que se devuelve en la respuesta del `POST`. La consulta pública usa ese código y **nunca** el id secuencial, de modo que no es posible adivinar pedidos de otros clientes.
 
