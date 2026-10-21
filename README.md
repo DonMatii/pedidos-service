@@ -56,7 +56,7 @@ Respuesta `201 Created`:
   "id": 1,
   "cliente": "E2E Test",
   "email": "e2e@test.cl",
-  "fecha": "2026-10-01T21:29:01.733033",
+  "fecha": "2026-10-01T21:29:01.733033Z",
   "total": 30000,
   "productos": [
     { "nombre": "Torta E2E", "cantidad": 2, "precioUnitario": 15000, "subtotal": 30000 }
@@ -67,6 +67,7 @@ Respuesta `201 Created`:
 
 * El `total` se calcula en el servidor como la suma de `cantidad * precioUnitario` de cada producto: nunca se confía en un total enviado por el cliente.
 * `eventoPublicado` es `true` cuando el broker de Kafka confirmó la publicación dentro del request (espera máxima de 5 s).
+* `fecha` es el instante del pedido en **UTC con sufijo `Z`**. Esa marca es la que permite al frontend convertirla a la hora de Chile sin tener que adivinar la zona horaria.
 
 Validación de RF-07 → `400 Bad Request` con cuerpo `{"mensaje": "..."}`:
 

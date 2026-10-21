@@ -2,7 +2,7 @@ package cl.ochodigital.pasteleriamydreams.pedidosservice.dto;
 
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 // Respuesta estándar de los endpoints de pedidos (RF-07 / RF-08)
@@ -12,7 +12,9 @@ public class PedidoResponse {
     private Long id;
     private String cliente;
     private String email;
-    private LocalDateTime fecha;
+    // Instante UTC: Jackson lo serializa con sufijo Z, la marca que el frontend
+    // /estado necesita para convertir a America/Santiago sin adivinar la zona.
+    private Instant fecha;
     private Integer total;
     // Estado actual del pedido que devuelven los endpoints (RF-11)
     private String estado;

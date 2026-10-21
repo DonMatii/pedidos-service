@@ -11,6 +11,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.hamcrest.Matchers.endsWith;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -162,5 +163,24 @@ class PedidoDescuentoIntegrationTest {
         // Sin email no hay forma de saber si puede canjear: se rechaza, no se adivina
         mockMvc.perform(get("/api/pedidos/bienvenida/estado"))
                 .andExpect(status().isBadRequest());
+    }
+
+    // La fecha viaja como instante UTC identificado (sufijo Z). Sin esa marca el
+    // frontend /estado no puede saber la zona: adivina que es UTC, pero si el
+    // backend manda hora local de Chile termina restando el offset dos veces y
+    // muestra la hora 3 horas atras.
+    @Test
+    void laFechaSeSerializaEnUtcConSufijoZ() throws Exception {
+        mockMvc.perform(post("/api/pedidos")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cliente\":\"Zona Horaria\",\"email\":\"zona@ejemplo.cl\","
+                                + "\"productos\":[{\"nombre\":\"Torta\",\"cantidad\":1,\"precioUnitario\":10000}]}"))
+                .andExpect(status().isCreated());
+
+        var guardado = pedidoRepository.findAll().get(0);
+
+        mockMvc.perform(get("/api/pedidos/seguimiento/{codigo}", guardado.getCodigoConsulta()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fecha", endsWith("Z")));
     }
 }

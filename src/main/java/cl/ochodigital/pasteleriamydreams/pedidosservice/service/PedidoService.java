@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -254,7 +255,9 @@ public class PedidoService {
         respuesta.setId(pedido.getId());
         respuesta.setCliente(pedido.getCliente());
         respuesta.setEmail(pedido.getEmail());
-        respuesta.setFecha(pedido.getFecha());
+        // La entidad guarda la hora local de la JVM: se convierte a instante UTC para
+        // que el JSON salga con sufijo Z y el frontend no tenga que adivinar la zona.
+        respuesta.setFecha(pedido.getFecha().atZone(ZoneId.systemDefault()).toInstant());
         int descuento = pedido.getDescuento() == null ? 0 : pedido.getDescuento();
         int subtotal = pedido.getTotal() + descuento;
         // Desglose: la bienvenida es exactamente el 10% del subtotal solo si el
