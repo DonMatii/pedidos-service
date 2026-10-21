@@ -32,7 +32,7 @@ Diseñado y construido por **8 Digital**.
 | `GET` | `/api/pedidos/{id}` | Consulta un pedido por su id (devuelve `404` si no existe). |
 | `PATCH` | `/api/pedidos/{id}/estado` | Cambia el estado de un pedido (RF-11): `200` actualizado, `400` si el estado no es válido, `404` si no existe. |
 | `GET` | `/api/pedidos/bienvenida/estado` | Consulta pública la elegibilidad del código `BIENVENIDO10` para un email: `{ "elegible": true \| false }`. El frontend la usa antes de prometer el descuento. |
-| `GET` | `/api/pedidos/estadisticas/productos?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` | Qué se vendió en un rango de fechas: lista de `{ nombre, unidades, monto }` por producto, de más a menos vendido. Alimenta el dashboard de administración (S3). Requiere `X-Api-Key`. |
+| `GET` | `/api/pedidos/estadisticas/productos?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` | Qué se vendió en un rango de fechas: lista de `{ nombre, unidades, monto }` por producto, de más a menos vendido. El rango se compara por **fecha calendario**, de modo que los pedidos de la madrugada caen en su día aunque la base guarde en UTC. Alimenta el dashboard de administración (S3). Requiere `X-Api-Key`. |
 
 CORS está abierto para dos orígenes: el frontend local `http://localhost:5173` y el sitio público desplegado en S3 (`http://pasteleria-my-dreams-web-8digital.s3-website-us-east-1.amazonaws.com`).
 
