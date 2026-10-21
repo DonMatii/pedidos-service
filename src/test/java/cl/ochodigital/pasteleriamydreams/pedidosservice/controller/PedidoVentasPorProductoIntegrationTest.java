@@ -97,6 +97,34 @@ class PedidoVentasPorProductoIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    // Regresión del bug de huso horario: un pedido a las 00:30 pertenece al día de
+    // calendario que le toca. Al comparar el datetime contra un rango a midnight, el
+    // driver JDBC con serverTimezone=UTC corría el límite ~3h y dejaba la madrugada
+    // fuera del día (S3)
+    @Test
+    void incluyeLosPedidosDeLaMadrugadaEnSuDiaDeCalendario() throws Exception {
+        LocalDate hoy = LocalDate.now();
+
+        Pedido madrugada = new Pedido();
+        madrugada.setCliente("Nocturno Test");
+        madrugada.setEmail("noche@ejemplo.cl");
+        madrugada.setTotal(20000);
+        madrugada.setFecha(hoy.atTime(0, 30));
+        madrugada.getItems().add(item(madrugada, "Kuchen de Manzana", 2, 10000));
+        pedidoRepository.save(madrugada);
+
+        // Muffins(6), Selva Negra(3), Kuchen(2), Tarta(1): ordenadas por unidades desc
+        mockMvc.perform(get("/api/pedidos/estadisticas/productos")
+                        .param("desde", hoy.toString())
+                        .param("hasta", hoy.toString())
+                        .header("X-Api-Key", API_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(4))
+                .andExpect(jsonPath("$[2].nombre").value("Kuchen de Manzana"))
+                .andExpect(jsonPath("$[2].unidades").value(2))
+                .andExpect(jsonPath("$[2].monto").value(20000));
+    }
+
     private PedidoItem item(Pedido pedido, String nombre, int cantidad, int precio) {
         PedidoItem i = new PedidoItem();
         i.setNombre(nombre);

@@ -129,9 +129,10 @@ public class PedidoService {
     // Agrega por producto las unidades y el monto vendidos en un rango de fechas (S3):
     // alimenta la seccion "que se vendio" del dashboard de administracion
     public List<PedidoRepository.VentasPorProducto> ventasPorProducto(LocalDate desde, LocalDate hasta) {
-        // El filtro es [desde 00:00, hasta+1 00:00): inclusivo de inicio, exclusivo de fin,
-        // para que "hasta = hoy" incluya los pedidos de hoy enteros (fecha es LocalDateTime)
-        return pedidoRepository.buscarVentasPorProducto(desde.atStartOfDay(), hasta.plusDays(1).atStartOfDay());
+        // El rango es por FECHA DE CALENDARIO inclusivo en ambos extremos: la query compara
+        // DATE(fecha), asi que "desde = hasta = hoy" trae los pedidos de hoy enteros sin
+        // desfase de huso horario ni pedidos de la madrugada fuera del dia
+        return pedidoRepository.buscarVentasPorProducto(desde, hasta);
     }
 
     // Cambia el estado de un pedido, lo persiste y devuelve la respuesta actualizada (RF-11)
