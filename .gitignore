@@ -42,6 +42,10 @@ build/
 .codegraph/
 odd/
 
+# Credenciales locales (nunca se commitean)
+.env.local
+!.env.local.example
+
 # Logs locales de arranque (nunca se commitean)
 run.log
 run-err.log

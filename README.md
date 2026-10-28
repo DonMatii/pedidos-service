@@ -208,6 +208,7 @@ Kafka topic `pedidos`
 - **Públicos sin autenticación:** `POST /api/pedidos` (crear pedido), `GET /api/pedidos/seguimiento/{codigo}` (consulta pública RF-11) y `GET /api/pedidos/bienvenida/estado` (elegibilidad del código de bienvenida).
 - **Protegidos con header `X-Api-Key`:** `GET /api/pedidos` (listado), `GET /api/pedidos/{id}`, `PATCH /api/pedidos/{id}/estado` y `GET /api/pedidos/estadisticas/productos` (unidades por producto del dashboard).
 - La clave se configura en la variable de entorno `APP_ADMIN_API_KEY` (propiedad `app.admin-api-key`). Si no está definida, los endpoints protegidos responden `503` (fail-closed: nunca quedan abiertos por omisión).
+- **Arranque local:** copia `.env.local.example` a `.env.local` y completa `APP_ADMIN_API_KEY` (mismo valor que `VITE_ADMIN_API_KEY` del frontend); `.\start-local.ps1` la carga antes de arrancar. Sin la variable, `.\mvnw.cmd spring-boot:run` arranca igual pero las escrituras responden `503`.
 - **Protección IDOR:** al registrar un pedido se genera un *código de seguimiento* opaco (UUID de 32 caracteres) que se devuelve en la respuesta del `POST`. La consulta pública usa ese código y **nunca** el id secuencial, de modo que no es posible adivinar pedidos de otros clientes.
 
 ## Descuento de bienvenida (primera conexión)
