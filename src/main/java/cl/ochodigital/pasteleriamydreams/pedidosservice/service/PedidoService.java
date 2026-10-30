@@ -4,6 +4,7 @@ import cl.ochodigital.pasteleriamydreams.pedidosservice.client.DeliciaClient;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.dto.PedidoRequest;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.dto.PedidoResponse;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.event.PedidoCreadoEvent;
+import cl.ochodigital.pasteleriamydreams.pedidosservice.event.PedidoEstadoCambiadoEvent;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.model.Pedido;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.model.PedidoItem;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.repository.PedidoRepository;
@@ -48,6 +49,10 @@ public class PedidoService {
     private final ObjectMapper objectMapper;
     private final DeliciaClient deliciaClient;
     private final String topicoPedidos;
+    // Topic PROPIO para los cambios de estado: no puede ser el mismo que `pedidos`
+    // porque el listener de notificaciones guarda una fila unica por pedidoId y
+    // descartaria un segundo evento del mismo pedido como duplicado.
+    private final String topicoEstados;
 
     // Inyectamos el repositorio (H2 en tests, MySQL/RDS en runtime), el productor de
     // Kafka y el cliente de catalogo-service para consultar la Delicia del Día
@@ -55,12 +60,14 @@ public class PedidoService {
                          KafkaTemplate<String, String> kafkaTemplate,
                          ObjectMapper objectMapper,
                          DeliciaClient deliciaClient,
-                         @Value("${app.kafka.topic}") String topicoPedidos) {
+                         @Value("${app.kafka.topic}") String topicoPedidos,
+                         @Value("${app.kafka.topic.estados:pedidos-estados}") String topicoEstados) {
         this.pedidoRepository = pedidoRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
         this.deliciaClient = deliciaClient;
         this.topicoPedidos = topicoPedidos;
+        this.topicoEstados = topicoEstados;
     }
 
     // Valida la solicitud, calcula el total, persiste el pedido y recién entonces publica el evento
@@ -145,8 +152,16 @@ public class PedidoService {
             throw new IllegalArgumentException("Estado invalido: " + estado);
         }
         Pedido actualizado = pedido.get();
+        String estadoAnterior = actualizado.getEstado();
         actualizado.setEstado(estado);
         Pedido guardado = pedidoRepository.save(actualizado);
+
+        // Solo se publica si el estado REALMENTE cambio: guardar el mismo estado otra
+        // vez no es un avance del pedido y no debe disparar un correo repetido al cliente.
+        // El pedido ya quedo persistido igual; la publicacion es best-effort como en registrar().
+        if (!estado.equals(estadoAnterior)) {
+            publicarEventoEstadoCambiado(guardado, estadoAnterior, estado);
+        }
         return Optional.of(armarRespuesta(guardado, false));
     }
 
@@ -204,6 +219,35 @@ public class PedidoService {
             // El pedido ya quedó guardado: solo registramos el fallo y respondemos eventoPublicado=false
             log.error("No se pudo publicar el evento del pedido {}: {}", pedido.getId(), e.getMessage());
             return false;
+        }
+    }
+
+    // Publica PedidoEstadoCambiado en el topic PROPIO de estados. Best-effort y silencioso
+    // como publicarEventoCreado: el pedido ya esta persistido, asi que un fallo de Kafka
+    // solo significa que ese cambio no genera correo; la administradora igual ve su cambio.
+    private void publicarEventoEstadoCambiado(Pedido pedido, String estadoAnterior, String estadoNuevo) {
+        PedidoEstadoCambiadoEvent evento = new PedidoEstadoCambiadoEvent(
+                "PedidoEstadoCambiado",
+                pedido.getId(),
+                pedido.getCliente(),
+                pedido.getEmail(),
+                estadoAnterior,
+                estadoNuevo,
+                pedido.getTotal(),
+                pedido.getFecha(),
+                pedido.getCodigoConsulta()
+        );
+
+        try {
+            String json = objectMapper.writeValueAsString(evento);
+            kafkaTemplate.send(topicoEstados, json).get(TIMEOUT_PUBLICACION_SEGUNDOS, TimeUnit.SECONDS);
+            log.info("Evento PedidoEstadoCambiado publicado en el topic '{}' para el pedido {} ({} -> {})",
+                    topicoEstados, pedido.getId(), estadoAnterior, estadoNuevo);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("Publicacion del evento de estado interrumpida para el pedido {}", pedido.getId(), e);
+        } catch (Exception e) {
+            log.error("No se pudo publicar el cambio de estado del pedido {}: {}", pedido.getId(), e.getMessage());
         }
     }
 

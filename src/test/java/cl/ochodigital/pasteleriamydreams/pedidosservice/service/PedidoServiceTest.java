@@ -38,7 +38,7 @@ class PedidoServiceTest {
         kafkaTemplate = mock(KafkaTemplate.class);
         deliciaClient = mock(DeliciaClient.class);
         ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
-        pedidoService = new PedidoService(pedidoRepository, kafkaTemplate, objectMapper, deliciaClient, "pedidos");
+        pedidoService = new PedidoService(pedidoRepository, kafkaTemplate, objectMapper, deliciaClient, "pedidos", "pedidos-estados");
 
         // Sin delicia del día por omisión: los tests previos conservan su comportamiento
         when(deliciaClient.obtenerNombreDelicia()).thenReturn(Optional.empty());
