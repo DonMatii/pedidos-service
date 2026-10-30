@@ -8,7 +8,7 @@ Microservicio de pedidos del sistema **Pastelería My Dreams**: recibe los pedid
 | :--- | :--- | :--- |
 | `version-1` | **Entrega 1** | Sin pedidos (solo catálogo). |
 | `version-2` | **Entrega 2** | Flujo de pedidos con Kafka: registro persistido + evento `PedidoCreado`. |
-| `version-3` | **Unidad 3** | Pendiente. |
+| `version-3` | **Unidad 3** | Cambio de estado con aviso al cliente: `cambiarEstado()` publica `PedidoEstadoCambiado` en el topic **propio** `pedidos-estados`, solo cuando el estado realmente cambió. |
 
 `main` siempre lleva el último avance del desarrollo.
 

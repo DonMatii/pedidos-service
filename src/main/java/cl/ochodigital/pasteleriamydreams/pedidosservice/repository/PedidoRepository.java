@@ -18,6 +18,10 @@ public interface PedidoRepository extends JpaRepository<Pedido, Long> {
     // Consulta publica por el codigo opaco de seguimiento (RF-11)
     Optional<Pedido> findByCodigoConsulta(String codigoConsulta);
 
+    // Carga el pedido con sus items para el desglose de productos (usado al cambiar estado)
+    @Query("SELECT p FROM Pedido p JOIN FETCH p.items WHERE p.id = :id")
+    Optional<Pedido> findByIdWithItems(@Param("id") Long id);
+
     // Uso unico del codigo de bienvenida: ese email ya lo canjeo?
     boolean existsByEmailIgnoreCaseAndCodigoDescuento(String email, String codigoDescuento);
 

@@ -2,6 +2,7 @@ package cl.ochodigital.pasteleriamydreams.pedidosservice.service;
 
 import cl.ochodigital.pasteleriamydreams.pedidosservice.client.DeliciaClient;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.model.Pedido;
+import cl.ochodigital.pasteleriamydreams.pedidosservice.model.PedidoItem;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.repository.PedidoRepository;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -62,8 +63,23 @@ class PedidoEstadoPublicacionIntegrationTest {
         Pedido pedido = new Pedido();
         pedido.setCliente("Daniela Soto");
         pedido.setEmail("daniela@ejemplo.cl");
-        pedido.setTotal(18990);
+        pedido.setTotal(33990);
         pedido.setCodigoConsulta(CODIGO_SEGUIMIENTO);
+
+        PedidoItem torta = new PedidoItem();
+        torta.setNombre("Torta de chocolate");
+        torta.setCantidad(1);
+        torta.setPrecioUnitario(18990);
+        torta.setPedido(pedido);
+        pedido.getItems().add(torta);
+
+        PedidoItem alfajor = new PedidoItem();
+        alfajor.setNombre("Alfajor");
+        alfajor.setCantidad(3);
+        alfajor.setPrecioUnitario(5000);
+        alfajor.setPedido(pedido);
+        pedido.getItems().add(alfajor);
+
         // La entidad arranca en RECIBIDO por defecto
         idPedido = pedidoRepository.save(pedido).getId();
     }
@@ -87,6 +103,10 @@ class PedidoEstadoPublicacionIntegrationTest {
         assertTrue(mensaje.contains("daniela@ejemplo.cl"), "Debio traer el email: " + mensaje);
         assertTrue(mensaje.contains(CODIGO_SEGUIMIENTO),
                 "Debio traer el codigo de seguimiento para el enlace del correo: " + mensaje);
+        assertTrue(mensaje.contains("Torta de chocolate"),
+                "Debio traer los productos del pedido: " + mensaje);
+        assertTrue(mensaje.contains("Alfajor"),
+                "Debio traer los productos del pedido: " + mensaje);
     }
 
     @Test

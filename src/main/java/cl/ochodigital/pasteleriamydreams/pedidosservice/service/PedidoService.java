@@ -160,7 +160,9 @@ public class PedidoService {
         // vez no es un avance del pedido y no debe disparar un correo repetido al cliente.
         // El pedido ya quedo persistido igual; la publicacion es best-effort como en registrar().
         if (!estado.equals(estadoAnterior)) {
-            publicarEventoEstadoCambiado(guardado, estadoAnterior, estado);
+            // Recargar con items para el desglose de productos en el correo al cliente
+            Pedido pedidoParaEvento = pedidoRepository.findByIdWithItems(guardado.getId()).orElse(guardado);
+            publicarEventoEstadoCambiado(pedidoParaEvento, estadoAnterior, estado);
         }
         return Optional.of(armarRespuesta(guardado, false));
     }
@@ -226,6 +228,15 @@ public class PedidoService {
     // como publicarEventoCreado: el pedido ya esta persistido, asi que un fallo de Kafka
     // solo significa que ese cambio no genera correo; la administradora igual ve su cambio.
     private void publicarEventoEstadoCambiado(Pedido pedido, String estadoAnterior, String estadoNuevo) {
+        // Desglose de productos para que el correo al cliente muestre lo que compro
+        List<PedidoEstadoCambiadoEvent.ProductoEstado> productos = pedido.getItems().stream()
+                .map(item -> new PedidoEstadoCambiadoEvent.ProductoEstado(
+                        item.getNombre(),
+                        item.getCantidad(),
+                        item.getPrecioUnitario(),
+                        item.getSubtotal()))
+                .collect(Collectors.toList());
+
         PedidoEstadoCambiadoEvent evento = new PedidoEstadoCambiadoEvent(
                 "PedidoEstadoCambiado",
                 pedido.getId(),
@@ -235,7 +246,8 @@ public class PedidoService {
                 estadoNuevo,
                 pedido.getTotal(),
                 pedido.getFecha(),
-                pedido.getCodigoConsulta()
+                pedido.getCodigoConsulta(),
+                productos
         );
 
         try {

@@ -1,6 +1,7 @@
 package cl.ochodigital.pasteleriamydreams.pedidosservice.event;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 // Evento publicado en el topic `pedidos-estados` cuando la administradora cambia
 // el estado de un pedido (RF-11). Topic PROPIO y separado de `pedidos` a proposito:
@@ -9,6 +10,7 @@ import java.time.LocalDateTime;
 //
 // Lleva estadoAnterior y estadoNuevo para que el correo al cliente nombre el
 // estado al que PASO, y codigoConsulta para el enlace de seguimiento publico.
+// Lleva productos para que el correo al cliente muestre lo que compro.
 public record PedidoEstadoCambiadoEvent(
         String evento,
         Long id,
@@ -18,5 +20,14 @@ public record PedidoEstadoCambiadoEvent(
         String estadoNuevo,
         Integer total,
         LocalDateTime fecha,
-        String codigoConsulta) {
+        String codigoConsulta,
+        List<ProductoEstado> productos) {
+
+    // Desglose de un producto dentro del pedido, para mostrar en el correo al cliente
+    public record ProductoEstado(
+            String nombre,
+            Integer cantidad,
+            Integer precioUnitario,
+            Integer subtotal) {
+    }
 }
