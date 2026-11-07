@@ -112,6 +112,53 @@ class PedidoEstadoIntegrationTest {
     }
 
     @Test
+    void cambiarEstadoRechazaRetrocesoDesdeDespachado() throws Exception {
+        // El pedido llega a DESPACHADO
+        mockMvc.perform(patch("/api/pedidos/{id}/estado", idPedido)
+                        .header("X-Api-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"estado\":\"DESPACHADO\"}"))
+                .andExpect(status().isOk());
+
+        // Volver a RECIBIDO tambien se rechaza: la regla no es solo sobre el
+        // estado final, es sobre todo el ciclo
+        mockMvc.perform(patch("/api/pedidos/{id}/estado", idPedido)
+                        .header("X-Api-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"estado\":\"RECIBIDO\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensaje")
+                        .value("No se puede retroceder el estado del pedido: de DESPACHADO a RECIBIDO"));
+
+        // El estado real no cambio: el pedido sigue despachado
+        mockMvc.perform(get("/api/pedidos/{id}", idPedido)
+                        .header("X-Api-Key", API_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("DESPACHADO"));
+    }
+
+    @Test
+    void cambiarEstadoConEstadoGuardadoDesconocidoNoBloqueaElCambio() throws Exception {
+        // Pedido con un estado fuera del ciclo: un dato inesperado de una base vieja
+        Pedido legado = new Pedido();
+        legado.setCliente("Pedro Legacy");
+        legado.setEmail("pedro@ejemplo.cl");
+        legado.setTotal(10000);
+        legado.setEstado("PERDIDO");
+        legado.setCodigoConsulta("b2c3d4e5f6a7b2c3d4e5f6a7b2c3d4e5f6");
+        Long idLegado = pedidoRepository.save(legado).getId();
+
+        // La regla solo impide retroceder dentro del ciclo conocido: un estado
+        // desconocido no bloquea el cambio (fail-open)
+        mockMvc.perform(patch("/api/pedidos/{id}/estado", idLegado)
+                        .header("X-Api-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"estado\":\"DESPACHADO\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("DESPACHADO"));
+    }
+
+    @Test
     void cambiarEstadoResponde404SiElPedidoNoExiste() throws Exception {
         mockMvc.perform(patch("/api/pedidos/{id}/estado", 999999L)
                         .header("X-Api-Key", API_KEY)

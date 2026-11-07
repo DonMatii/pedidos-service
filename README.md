@@ -186,7 +186,7 @@ docker compose up -d         # broker Kafka (en este repo)
 .\mvnw.cmd test
 ```
 
-Los tests corren sobre H2 en memoria (ver `src/test/resources/application.properties`), por lo que no requieren MySQL ni Kafka levantados: hay tests unitarios del servicio, tests MockMvc de los endpoints (incluido el cambio de estado RF-11 y la regla de no retroceso) y un test de integración de publicación con broker embebido (`@EmbeddedKafka`). La suite completa son **63 pruebas**.
+Los tests corren sobre H2 en memoria (ver `src/test/resources/application.properties`), por lo que no requieren MySQL ni Kafka levantados: hay tests unitarios del servicio, tests MockMvc de los endpoints (incluido el cambio de estado RF-11 y la regla de no retroceso) y un test de integración de publicación con broker embebido (`@EmbeddedKafka`). La suite completa son **66 pruebas**.
 
 ## 🔄 Flujo end-to-end
 
@@ -238,4 +238,4 @@ Kafka topic `pedidos`
 - **El mismo estado no es un retroceso:** el `PATCH` con el estado que el pedido ya tiene responde `200` y no publica evento, para no generar un correo repetido al cliente.
 - **Quién lo aplica:** el panel de administración es el único consumidor de este endpoint. Su desplegable ofrece **solo el estado actual y los siguientes**, de modo que nunca ofrece una acción que el servidor vaya a rechazar; el backend sigue siendo la regla que valida, y el panel es la guía.
 - **Fail-open ante un estado desconocido:** si el estado actual del pedido no está en el ciclo (un dato inesperado de una base vieja), el cambio no se bloquea: la regla solo impide retroceder dentro del ciclo conocido.
-- **Cobertura:** `PedidoEstadoIntegrationTest` fija el rechazo del retroceso (con el estado persistido intacto después del `400`) y que el mismo estado no cuente como retroceso.
+- **Cobertura:** `PedidoEstadoIntegrationTest` fija el rechazo del retroceso (con el estado persistido intacto después del `400`), que el retroceso se rechaza **desde cualquier estado del ciclo** (no solo desde el final), que el **mismo estado** no cuenta como retroceso y que un estado guardado fuera del ciclo **no bloquea** el cambio (fail-open). `PedidoEstadoPublicacionIntegrationTest` fija que pedir **el mismo estado en el que ya está** un pedido avanzado no publica un segundo evento, para no repetir el correo al cliente.

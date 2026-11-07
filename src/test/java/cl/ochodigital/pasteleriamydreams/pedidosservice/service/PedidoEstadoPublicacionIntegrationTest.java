@@ -119,6 +119,21 @@ class PedidoEstadoPublicacionIntegrationTest {
     }
 
     @Test
+    void guardarElMismoEstadoEnUnEstadoAvanzadoNoPublicaEvento() {
+        // El pedido avanza a DESPACHADO: eso si es un cambio y publica un evento
+        pedidoService.cambiarEstado(idPedido, "DESPACHADO");
+        String evento = recibirEvento(10_000);
+        assertTrue(evento.contains("\"estadoNuevo\":\"DESPACHADO\""), evento);
+
+        // Pedir DESPACHADO de nuevo, con el pedido ya despachado, no es un cambio:
+        // no debe publicarse un segundo evento (ni repetir el correo al cliente)
+        pedidoService.cambiarEstado(idPedido, "DESPACHADO");
+
+        assertThrows(AssertionError.class, () -> recibirEvento(2_000),
+                "No debio llegar evento si el estado no cambio: no debe repetir el correo");
+    }
+
+    @Test
     void elCicloCompletoPublicaUnEventoPorCadaSalto() {
         pedidoService.cambiarEstado(idPedido, "EN_PREPARACION");
         String primero = recibirEvento(10_000);
