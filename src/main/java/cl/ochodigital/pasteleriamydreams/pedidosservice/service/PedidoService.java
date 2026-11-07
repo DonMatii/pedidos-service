@@ -37,6 +37,13 @@ public class PedidoService {
     private static final Set<String> ESTADOS_VALIDOS =
             Set.of("RECIBIDO", "EN_PREPARACION", "DESPACHADO", "ENTREGADO");
 
+    // Ciclo de vida de un pedido, en orden. El flujo es lineal: un pedido avanza
+    // (se puede saltar a un estado posterior) pero NO retrocede. Un pedido ya
+    // entregado quedó listo y es parte del registro de lo que hizo la pastelería,
+    // así que volver a un estado anterior se rechaza con 400.
+    private static final List<String> CICLO_ESTADOS =
+            List.of("RECIBIDO", "EN_PREPARACION", "DESPACHADO", "ENTREGADO");
+
     // Codigo de bienvenida: -10% en el primer pedido de quien se conecta la primera vez
     public static final String CODIGO_BIENVENIDO = "BIENVENIDO10";
     private static final int PORCENTAJE_BIENVENIDO = 10;
@@ -153,6 +160,10 @@ public class PedidoService {
         }
         Pedido actualizado = pedido.get();
         String estadoAnterior = actualizado.getEstado();
+        if (esRetroceso(estadoAnterior, estado)) {
+            throw new IllegalArgumentException(
+                    "No se puede retroceder el estado del pedido: de " + estadoAnterior + " a " + estado);
+        }
         actualizado.setEstado(estado);
         Pedido guardado = pedidoRepository.save(actualizado);
 
@@ -165,6 +176,19 @@ public class PedidoService {
             publicarEventoEstadoCambiado(pedidoParaEvento, estadoAnterior, estado);
         }
         return Optional.of(armarRespuesta(guardado, false));
+    }
+
+    // True si el estado pedido es ANTERIOR al estado actual en el ciclo de vida.
+    // El mismo estado no es un retroceso (guardar dos veces lo mismo no avanza ni
+    // retrocede). Si alguno de los dos estados no está en el ciclo (un dato
+    // inesperado de una base vieja) no se bloquea el cambio: fail-open.
+    private boolean esRetroceso(String estadoAnterior, String estadoNuevo) {
+        int indiceAnterior = CICLO_ESTADOS.indexOf(estadoAnterior);
+        int indiceNuevo = CICLO_ESTADOS.indexOf(estadoNuevo);
+        if (indiceAnterior < 0 || indiceNuevo < 0) {
+            return false;
+        }
+        return indiceNuevo < indiceAnterior;
     }
 
     // Delicia del Día: -10% sobre el subtotal completo, una sola vez por transacción,

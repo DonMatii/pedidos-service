@@ -76,6 +76,42 @@ class PedidoEstadoIntegrationTest {
     }
 
     @Test
+    void cambiarEstadoResponde400SiSeIntentaRetrocederElPedido() throws Exception {
+        // El pedido llega a ENTREGADO: quedo listo y su registro no se reescribe
+        mockMvc.perform(patch("/api/pedidos/{id}/estado", idPedido)
+                        .header("X-Api-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"estado\":\"ENTREGADO\"}"))
+                .andExpect(status().isOk());
+
+        // Volver a un estado anterior se rechaza
+        mockMvc.perform(patch("/api/pedidos/{id}/estado", idPedido)
+                        .header("X-Api-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"estado\":\"DESPACHADO\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensaje")
+                        .value("No se puede retroceder el estado del pedido: de ENTREGADO a DESPACHADO"));
+
+        // El estado real no cambio: el pedido sigue entregado
+        mockMvc.perform(get("/api/pedidos/{id}", idPedido)
+                        .header("X-Api-Key", API_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("ENTREGADO"));
+    }
+
+    @Test
+    void cambiarEstadoAlMismoEstadoNoCuentaComoRetroceso() throws Exception {
+        // El pedido arranca en RECIBIDO: pedir el mismo estado no es retroceder
+        mockMvc.perform(patch("/api/pedidos/{id}/estado", idPedido)
+                        .header("X-Api-Key", API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"estado\":\"RECIBIDO\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("RECIBIDO"));
+    }
+
+    @Test
     void cambiarEstadoResponde404SiElPedidoNoExiste() throws Exception {
         mockMvc.perform(patch("/api/pedidos/{id}/estado", 999999L)
                         .header("X-Api-Key", API_KEY)

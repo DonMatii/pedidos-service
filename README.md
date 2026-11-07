@@ -92,7 +92,7 @@ Devuelve `200` con el pedido, o `404` si el id no existe.
 
 ### PATCH /api/pedidos/{id}/estado
 
-Cambia el estado de un pedido (RF-11). Cuerpo: `{"estado": "EN_PREPARACION"}`. Estados válidos: `RECIBIDO` (estado con el que nace todo pedido), `EN_PREPARACION`, `DESPACHADO`, `ENTREGADO`. Devuelve `200` con el pedido actualizado, `400` con `{"mensaje": ...}` si el estado no es válido, o `404` si el id no existe. La columna `estado` la agrega automáticamente `ddl-auto=update` al arrancar.
+Cambia el estado de un pedido (RF-11). Cuerpo: `{"estado": "EN_PREPARACION"}`. Estados válidos: `RECIBIDO` (estado con el que nace todo pedido), `EN_PREPARACION`, `DESPACHADO`, `ENTREGADO`. Devuelve `200` con el pedido actualizado, `400` con `{"mensaje": ...}` si el estado no es válido, `400` con `{"mensaje": ...}` si se intenta **retroceder** a un estado anterior, o `404` si el id no existe. La columna `estado` la agrega automáticamente `ddl-auto=update` al arrancar.
 
 ## 📨 Kafka (RF-08 / RNF-08)
 
@@ -186,7 +186,7 @@ docker compose up -d         # broker Kafka (en este repo)
 .\mvnw.cmd test
 ```
 
-Los tests corren sobre H2 en memoria (ver `src/test/resources/application.properties`), por lo que no requieren MySQL ni Kafka levantados: hay tests unitarios del servicio, tests MockMvc de los endpoints (incluido el cambio de estado RF-11) y un test de integración de publicación con broker embebido (`@EmbeddedKafka`).
+Los tests corren sobre H2 en memoria (ver `src/test/resources/application.properties`), por lo que no requieren MySQL ni Kafka levantados: hay tests unitarios del servicio, tests MockMvc de los endpoints (incluido el cambio de estado RF-11 y la regla de no retroceso) y un test de integración de publicación con broker embebido (`@EmbeddedKafka`). La suite completa son **63 pruebas**.
 
 ## 🔄 Flujo end-to-end
 
@@ -230,3 +230,12 @@ Kafka topic `pedidos`
 - **Fail-open:** la consulta a catalogo-service usa un timeout de 2 segundos; si el catálogo no responde (404, error o sin conexión), el pedido se crea igual y simplemente no recibe este descuento. Nunca bloquea la creación del pedido.
 - **La delicia la decide catalogo-service** (misma para todos los usuarios por fecha, sin repetir dentro de la semana): este servicio solo la consulta vía `app.catalogo.base-url` / `CATALOGO_URL`.
 - Los tests lo cubren con `DeliciaClientTest` (cliente con `MockRestServiceServer`), `PedidoServiceTest` y `PedidoDeliciaIntegrationTest` (stack completo con el cliente mockeado).
+
+## Ciclo de vida del pedido (lineal, sin retroceso)
+
+- **El flujo es de ida:** `RECIBIDO → EN_PREPARACION → DESPACHADO → ENTREGADO`. Se puede **saltar adelante** (un pedido puede pasar de `RECIBIDO` directo a `ENTREGADO` si ya salió a reparto), pero **volver a un estado anterior se rechaza con `400`** y el mensaje `No se puede retroceder el estado del pedido: de ENTREGADO a DESPACHADO`.
+- **Por qué:** un pedido ya entregado **quedó listo**. Es parte del registro de lo que hizo la pastelería —lo que se vendió en el día y en los últimos 7 días—, así que su estado no se reescribe. El registro histórico se apoya en la **fecha de creación** del pedido y en sus montos, no en su estado, así que bloquear el retroceso no altera ninguna cifra del dashboard.
+- **El mismo estado no es un retroceso:** el `PATCH` con el estado que el pedido ya tiene responde `200` y no publica evento, para no generar un correo repetido al cliente.
+- **Quién lo aplica:** el panel de administración es el único consumidor de este endpoint. Su desplegable ofrece **solo el estado actual y los siguientes**, de modo que nunca ofrece una acción que el servidor vaya a rechazar; el backend sigue siendo la regla que valida, y el panel es la guía.
+- **Fail-open ante un estado desconocido:** si el estado actual del pedido no está en el ciclo (un dato inesperado de una base vieja), el cambio no se bloquea: la regla solo impide retroceder dentro del ciclo conocido.
+- **Cobertura:** `PedidoEstadoIntegrationTest` fija el rechazo del retroceso (con el estado persistido intacto después del `400`) y que el mismo estado no cuente como retroceso.
