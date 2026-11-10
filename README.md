@@ -96,6 +96,10 @@ Cambia el estado de un pedido (RF-11). Cuerpo: `{"estado": "EN_PREPARACION"}`. E
 
 ## 📨 Kafka (RF-08 / RNF-08)
 
+### Stream de eventos de negocio (Entrega 3 — Kinesis)
+
+Cada evento de pedido sale por **dos caminos con destinos distintos**: la cola de **Kafka** mueve *tareas* (los correos de `notificaciones-service`) y el stream de **Kinesis** mueve *datos* (analítica en vivo). El productor `KinesisEventosPublisher` es best-effort como el de Kafka: un fallo del stream se registra y nunca rompe la venta. La partition key es el **id del pedido** (los eventos de un mismo pedido conservan su orden). Configuración (`application.properties`): `app.kinesis.stream=eventos-negocio`, `app.kinesis.endpoint` (vacío = AWS real; en local apunta a LocalStack `:4566`), `app.kinesis.habilitado`, `app.kinesis.auto-crear-stream`. El stream se crea solo en local (esperando a `ACTIVE`, porque la creación es asíncrona); en el lab se pre-crea o se usa la misma garantía.
+
 ### Contrato del evento
 
 Topic: `pedidos` (configurable con `app.kafka.topic`). El payload es un JSON serializado con el `ObjectMapper` de Spring. Ejemplo real publicado en la verificación E2E:

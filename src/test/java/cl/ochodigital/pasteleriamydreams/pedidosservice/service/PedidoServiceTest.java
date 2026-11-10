@@ -19,6 +19,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.*;
+import cl.ochodigital.pasteleriamydreams.pedidosservice.event.KinesisEventosPublisher;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -30,6 +31,7 @@ class PedidoServiceTest {
     private PedidoRepository pedidoRepository;
     private KafkaTemplate<String, String> kafkaTemplate;
     private DeliciaClient deliciaClient;
+    private KinesisEventosPublisher kinesisPublisher;
     private PedidoService pedidoService;
 
     @BeforeEach
@@ -37,8 +39,9 @@ class PedidoServiceTest {
         pedidoRepository = mock(PedidoRepository.class);
         kafkaTemplate = mock(KafkaTemplate.class);
         deliciaClient = mock(DeliciaClient.class);
+        kinesisPublisher = mock(KinesisEventosPublisher.class);
         ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
-        pedidoService = new PedidoService(pedidoRepository, kafkaTemplate, objectMapper, deliciaClient, "pedidos", "pedidos-estados");
+        pedidoService = new PedidoService(pedidoRepository, kafkaTemplate, kinesisPublisher, objectMapper, deliciaClient, "pedidos", "pedidos-estados");
 
         // Sin delicia del día por omisión: los tests previos conservan su comportamiento
         when(deliciaClient.obtenerNombreDelicia()).thenReturn(Optional.empty());

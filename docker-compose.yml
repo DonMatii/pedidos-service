@@ -34,6 +34,20 @@ services:
     volumes:
       - kafka-data:/tmp
 
+  # LocalStack: simulador de servicios AWS para desarrollar el streaming en
+  # local (solo Kinesis). El código usa el SDK de AWS con endpoint configurable:
+  # aquí apunta a localhost:4566 y en el lab al Kinesis real, sin cambios.
+  localstack:
+    image: localstack/localstack:3
+    container_name: pasteleria-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: kinesis
+      DEBUG: "0"
+    volumes:
+      - localstack-data:/var/lib/localstack
+
   # Consola web de administración del broker: crear/listar/borrar tópicos y
   # ver configuraciones sin escribir código propio. Decisión de arquitectura
   # documentada en el informe: herramienta estándar de la comunidad en vez de
@@ -53,3 +67,4 @@ services:
 
 volumes:
   kafka-data:
+  localstack-data:

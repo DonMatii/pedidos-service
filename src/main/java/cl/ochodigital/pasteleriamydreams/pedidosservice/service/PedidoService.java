@@ -3,6 +3,7 @@ package cl.ochodigital.pasteleriamydreams.pedidosservice.service;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.client.DeliciaClient;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.dto.PedidoRequest;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.dto.PedidoResponse;
+import cl.ochodigital.pasteleriamydreams.pedidosservice.event.KinesisEventosPublisher;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.event.PedidoCreadoEvent;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.event.PedidoEstadoCambiadoEvent;
 import cl.ochodigital.pasteleriamydreams.pedidosservice.model.Pedido;
@@ -53,6 +54,7 @@ public class PedidoService {
 
     private final PedidoRepository pedidoRepository;
     private final KafkaTemplate<String, String> kafkaTemplate;
+    private final KinesisEventosPublisher kinesisPublisher;
     private final ObjectMapper objectMapper;
     private final DeliciaClient deliciaClient;
     private final String topicoPedidos;
@@ -65,12 +67,14 @@ public class PedidoService {
     // Kafka y el cliente de catalogo-service para consultar la Delicia del Día
     public PedidoService(PedidoRepository pedidoRepository,
                          KafkaTemplate<String, String> kafkaTemplate,
+                         KinesisEventosPublisher kinesisPublisher,
                          ObjectMapper objectMapper,
                          DeliciaClient deliciaClient,
                          @Value("${app.kafka.topic}") String topicoPedidos,
                          @Value("${app.kafka.topic.estados:pedidos-estados}") String topicoEstados) {
         this.pedidoRepository = pedidoRepository;
         this.kafkaTemplate = kafkaTemplate;
+        this.kinesisPublisher = kinesisPublisher;
         this.objectMapper = objectMapper;
         this.deliciaClient = deliciaClient;
         this.topicoPedidos = topicoPedidos;
@@ -236,6 +240,9 @@ public class PedidoService {
             String json = objectMapper.writeValueAsString(evento);
             kafkaTemplate.send(topicoPedidos, json).get(TIMEOUT_PUBLICACION_SEGUNDOS, TimeUnit.SECONDS);
             log.info("Evento PedidoCreado publicado en el topic '{}' para el pedido {}", topicoPedidos, pedido.getId());
+            // El mismo evento entra al stream de Kinesis (Entrega 3): la cola de
+            // Kafka mueve TAREAS (los correos) y el stream mueve DATOS (analítica)
+            kinesisPublisher.publicar("pedido_creado", pedido.getId(), json);
             return true;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -279,6 +286,8 @@ public class PedidoService {
             kafkaTemplate.send(topicoEstados, json).get(TIMEOUT_PUBLICACION_SEGUNDOS, TimeUnit.SECONDS);
             log.info("Evento PedidoEstadoCambiado publicado en el topic '{}' para el pedido {} ({} -> {})",
                     topicoEstados, pedido.getId(), estadoAnterior, estadoNuevo);
+            // El mismo evento entra al stream de Kinesis (analítica en vivo)
+            kinesisPublisher.publicar("pedido_estado_cambiado", pedido.getId(), json);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.error("Publicacion del evento de estado interrumpida para el pedido {}", pedido.getId(), e);
