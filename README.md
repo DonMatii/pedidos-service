@@ -139,7 +139,7 @@ Verificado en la corrida E2E local: INSERT a las 21:29:01.733 → publicación a
 Broker Kafka local en modo KRaft (sin ZooKeeper) con la imagen `apache/kafka:3.9.0`, vía Docker Compose incluido en este repositorio:
 
 ```powershell
-docker compose up -d    # levanta el broker en el puerto 9092 y crea el topic `pedidos`
+docker compose up -d    # levanta el broker en el puerto 19092 (Windows reserva 9081-9180 para Hyper-V/WSL) y crea el topic `pedidos`
 docker compose down     # baja el broker (conserva el volumen de datos)
 docker compose down -v  # baja el broker y BORRA los datos (volumen)
 ```
@@ -166,7 +166,7 @@ Otras propiedades relevantes (`src/main/resources/application.properties`):
 | Propiedad | Valor |
 | :--- | :--- |
 | `server.port` | `8082` |
-| `spring.kafka.bootstrap-servers` | `localhost:9092` |
+| `spring.kafka.bootstrap-servers` | `localhost:19092` |
 | `app.kafka.topic` | `pedidos` |
 | `app.catalogo.base-url` | `${CATALOGO_URL:http://localhost:8080}` (URL de catalogo-service) |
 | `spring.jpa.hibernate.ddl-auto` | `update` (crea/actualiza `pedidos` y `pedido_items` al arrancar) |
