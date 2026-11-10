@@ -136,6 +136,8 @@ Verificado en la corrida E2E local: INSERT a las 21:29:01.733 → publicación a
 
 ## 🐳 Kafka local (broker)
 
+El compose levanta el broker **KRaft** con dos listeners: `PLAINTEXT` (`localhost:19092`) para los servicios del host e `INTERNAL` (`kafka:29092`) para los contenedores del mismo compose. Incluye además **kafka-ui** en http://localhost:8088 — consola web para crear/listar/borrar tópicos y ver configuraciones — elegida en vez de un microservicio administrador a medida (decisión de arquitectura documentada en el informe: herramienta estándar de la comunidad, y la regla de oro de postergar lo que no mejora ventas, retención ni el tiempo de Cathi).
+
 Broker Kafka local en modo KRaft (sin ZooKeeper) con la imagen `apache/kafka:3.9.0`, vía Docker Compose incluido en este repositorio:
 
 ```powershell

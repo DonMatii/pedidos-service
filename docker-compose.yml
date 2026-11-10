@@ -10,9 +10,13 @@ services:
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:19092,CONTROLLER://0.0.0.0:19093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:19092,CONTROLLER://localhost:19093
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      # Dos audiencias: PLAINTEXT para los servicios del host (localhost:19092)
+      # y INTERNAL para los contenedores del compose (kafka-ui). El advertised
+      # de cada listener apunta al nombre correcto segun quien se conecta.
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:19092,INTERNAL://0.0.0.0:29092,CONTROLLER://0.0.0.0:19093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:19092,INTERNAL://kafka:29092,CONTROLLER://localhost:19093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:19093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -29,6 +33,23 @@ services:
       start_period: 20s
     volumes:
       - kafka-data:/tmp
+
+  # Consola web de administración del broker: crear/listar/borrar tópicos y
+  # ver configuraciones sin escribir código propio. Decisión de arquitectura
+  # documentada en el informe: herramienta estándar de la comunidad en vez de
+  # un microservicio administrador a medida (regla de oro: si no mejora ventas,
+  # retención ni el tiempo de Cathi, se posterga).
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: pasteleria-kafka-ui
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8088:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: pasteleria
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
 
 volumes:
   kafka-data:
