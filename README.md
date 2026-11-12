@@ -94,6 +94,10 @@ Devuelve `200` con el pedido, o `404` si el id no existe.
 
 Versión habilitada por usuario (demo de las tres versiones). Devuelve `200` con `{"email": ..., "version": 1|2|3}`, `403` con `{"mensaje": "Usuario sin versión habilitada"}` si el correo no está en la tabla `usuarios_version`, o `400` si falta el email. La asignación es **un dato**: se cambia con un `UPDATE` sobre `usuarios_version` (sembrada al arrancar con los usuarios de prueba de Google), nunca con código.
 
+### POST /api/solicitudes
+
+Formulario de solicitud de pedido (Versión 1; NO es una venta). Cuerpo: `{"nombre": ..., "email": ..., "telefono": ..., "detalle": "Torta x2, Queque x1", "mensaje": ...}` (`telefono` y `mensaje` opcionales; `nombre`, `email` y `detalle` obligatorios). Devuelve `201` con la solicitud guardada (tabla `solicitudes`) o `400` con `{"mensaje": ...}` si falta un campo obligatorio. Al guardar publica el evento `solicitud_creada` en el topic de Kafka `solicitudes`, que el servicio de notificaciones procesa para enviar el correo "Pastelería My Dreams — Recibimos tu solicitud".
+
 ### PATCH /api/pedidos/{id}/estado
 
 Cambia el estado de un pedido (RF-11). Cuerpo: `{"estado": "EN_PREPARACION"}`. Estados válidos: `RECIBIDO` (estado con el que nace todo pedido), `EN_PREPARACION`, `DESPACHADO`, `ENTREGADO`. Devuelve `200` con el pedido actualizado, `400` con `{"mensaje": ...}` si el estado no es válido, `400` con `{"mensaje": ...}` si se intenta **retroceder** a un estado anterior, o `404` si el id no existe. La columna `estado` la agrega automáticamente `ddl-auto=update` al arrancar.
