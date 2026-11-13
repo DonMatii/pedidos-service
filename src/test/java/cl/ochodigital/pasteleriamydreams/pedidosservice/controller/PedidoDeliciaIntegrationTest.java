@@ -9,13 +9,16 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -42,11 +45,20 @@ class PedidoDeliciaIntegrationTest {
         pedidoRepository.deleteAll();
     }
 
+    // Sesión de Google preautenticada del usuario V2 sembrado (mat.suazog@duocuc.cl):
+    // POST /api/pedidos exige versión >= 2. El mapeo real email -> autoridades
+    // VERSION_1..N se prueba en AutenticacionJwtIntegrationTest.
+    private static RequestPostProcessor sesionUsuarioV2() {
+        return jwt().jwt(token -> token.claim("email", "mat.suazog@duocuc.cl"))
+                .authorities(new SimpleGrantedAuthority("VERSION_1"), new SimpleGrantedAuthority("VERSION_2"));
+    }
+
     @Test
     void pedidoConLaDeliciaDeHoyAplicaDiezPorCientoYLoPersiste() throws Exception {
         when(deliciaClient.obtenerNombreDelicia()).thenReturn(Optional.of("Torta Delicia"));
 
         mockMvc.perform(post("/api/pedidos")
+                        .with(sesionUsuarioV2())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(pedidoJson("Torta Delicia", null, 2)))
                 .andExpect(status().isCreated())
@@ -72,6 +84,7 @@ class PedidoDeliciaIntegrationTest {
         when(deliciaClient.obtenerNombreDelicia()).thenReturn(Optional.of("Torta Delicia"));
 
         mockMvc.perform(post("/api/pedidos")
+                        .with(sesionUsuarioV2())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(pedidoJson("Torta Delicia", "BIENVENIDO10", 2)))
                 .andExpect(status().isCreated())
@@ -86,6 +99,7 @@ class PedidoDeliciaIntegrationTest {
         when(deliciaClient.obtenerNombreDelicia()).thenReturn(Optional.of("Torta Selva Negra"));
 
         mockMvc.perform(post("/api/pedidos")
+                        .with(sesionUsuarioV2())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(pedidoJson("Torta Delicia", null, 1)))
                 .andExpect(status().isCreated())
@@ -100,6 +114,7 @@ class PedidoDeliciaIntegrationTest {
 
         // 4 unidades del destacado: el -10% es sobre el subtotal completo y una sola vez
         mockMvc.perform(post("/api/pedidos")
+                        .with(sesionUsuarioV2())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(pedidoJson("Torta Delicia", null, 4)))
                 .andExpect(status().isCreated())
@@ -114,6 +129,7 @@ class PedidoDeliciaIntegrationTest {
         when(deliciaClient.obtenerNombreDelicia()).thenThrow(new RuntimeException("catalogo caído"));
 
         mockMvc.perform(post("/api/pedidos")
+                        .with(sesionUsuarioV2())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(pedidoJson("Torta Delicia", null, 1)))
                 .andExpect(status().isCreated())
@@ -127,6 +143,7 @@ class PedidoDeliciaIntegrationTest {
         when(deliciaClient.obtenerNombreDelicia()).thenReturn(Optional.of("  torta delicia  "));
 
         mockMvc.perform(post("/api/pedidos")
+                        .with(sesionUsuarioV2())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(pedidoJson("TORTA DELICIA ", null, 1)))
                 .andExpect(status().isCreated())

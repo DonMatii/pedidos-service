@@ -15,8 +15,10 @@ import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.test.EmbeddedKafkaBroker;
 import org.springframework.kafka.test.context.EmbeddedKafka;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -28,16 +30,18 @@ import java.util.UUID;
 
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 // Solicitud de pedido de la Versión 1 (S2): formulario con el que el usuario V1
 // pide sus delicias SIN comprar (no es una venta: no hay carrito, total ni
-// código de seguimiento). El endpoint es público, igual que POST /api/pedidos,
-// y además publica el evento SolicitudCreado en el topic `solicitudes` para que
-// notificaciones-service avise por correo (misma forma de publicación que
-// PedidoCreado: JSON por KafkaTemplate, best-effort tras persistir).
+// código de seguimiento). El endpoint exige la sesión de Google con versión >= 1
+// (igual que POST /api/pedidos exige versión >= 2), y además publica el evento
+// SolicitudCreado en el topic `solicitudes` para que notificaciones-service avise
+// por correo (misma forma de publicación que PedidoCreado: JSON por KafkaTemplate,
+// best-effort tras persistir).
 @SpringBootTest
 @AutoConfigureMockMvc
 @EmbeddedKafka(partitions = 1, topics = {"solicitudes"})
@@ -48,6 +52,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SolicitudIntegrationTest {
 
     private static final String TOPICO = "solicitudes";
+
+    // Sesión de Google preautenticada de la usuaria V1 sembrada
+    // (catherine.godoy.g@gmail.com): POST /api/solicitudes exige versión >= 1.
+    // El mapeo real email -> autoridades VERSION_1..N se prueba en
+    // AutenticacionJwtIntegrationTest.
+    private static RequestPostProcessor sesionUsuarioV1() {
+        return jwt().jwt(token -> token.claim("email", "catherine.godoy.g@gmail.com"))
+                .authorities(new SimpleGrantedAuthority("VERSION_1"));
+    }
 
     @Autowired
     private MockMvc mockMvc;
@@ -62,7 +75,7 @@ class SolicitudIntegrationTest {
     void solicitudValidaResponde201SeGuardaYPublicaElEvento() throws Exception {
         long antes = solicitudRepository.count();
 
-        String respuesta = mockMvc.perform(post("/api/solicitudes")
+        String respuesta = mockMvc.perform(post("/api/solicitudes").with(sesionUsuarioV1())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"nombre":"Daniela Soto","email":"daniela@ejemplo.cl","telefono":"+56 9 8765 4321","detalle":"Torta de chocolate x1, Cupcakes vainilla x6","mensaje":"Para el sabado por la tarde"}"""))
@@ -95,7 +108,7 @@ class SolicitudIntegrationTest {
     void solicitudSinTelefonoNiMensajeEsValida() throws Exception {
         long antes = solicitudRepository.count();
 
-        mockMvc.perform(post("/api/solicitudes")
+        mockMvc.perform(post("/api/solicitudes").with(sesionUsuarioV1())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"nombre":"Catherine Godoy","email":"cat@ejemplo.cl","detalle":"Selva Negra x2"}"""))
@@ -128,7 +141,7 @@ class SolicitudIntegrationTest {
                 "{\"nombre\":\"Detalle Blanco\",\"email\":\"rechazada@ejemplo.cl\",\"detalle\":\" \"}",
         };
         for (String cuerpo : cuerposInvalidos) {
-            mockMvc.perform(post("/api/solicitudes")
+            mockMvc.perform(post("/api/solicitudes").with(sesionUsuarioV1())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(cuerpo))
                     .andExpect(status().isBadRequest())

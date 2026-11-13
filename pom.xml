@@ -29,6 +29,14 @@
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
 
+        <!-- Resource server OAuth2: valida el JWT de Google (firma por JWKS, emisor
+             y audiencia). De la validación sale el email confiable con el que se
+             exige la versión habilitada en los endpoints de usuario -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+
         <!-- Driver de MySQL para conectar a la base de datos de AWS RDS -->
         <dependency>
             <groupId>com.mysql</groupId>
@@ -67,6 +75,14 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Soporte de pruebas de Spring Security: tokens preautenticados con
+             jwt() para MockMvc en los tests de pedidos y solicitudes -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
 

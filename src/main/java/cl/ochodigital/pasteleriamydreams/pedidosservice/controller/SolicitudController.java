@@ -11,8 +11,8 @@ import java.util.Map;
 
 // Endpoints REST de las solicitudes de pedido de la Versión 1 (S2). Una solicitud
 // NO es una venta: el usuario V1 pide sus delicias con este formulario y la
-// pastelería le responde por correo. Endpoint público, misma postura que
-// POST /api/pedidos (el AdminApiKeyFilter solo protege /api/pedidos).
+// pastelería le responde por correo. Requiere sesión con Google (JWT) con
+// versión ≥ 1; el AdminApiKeyFilter sigue protegiendo solo el panel de /api/pedidos.
 @RestController
 @RequestMapping("/api/solicitudes")
 @CrossOrigin(origins = {

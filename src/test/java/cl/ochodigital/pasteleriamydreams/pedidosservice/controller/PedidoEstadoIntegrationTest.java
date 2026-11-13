@@ -10,8 +10,11 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -213,8 +216,13 @@ class PedidoEstadoIntegrationTest {
     }
 
     @Test
-    void creacionDePedidoSigueSiendoPublicaSinApiKey() throws Exception {
+    void creacionDePedidoNoExigeApiKeyPeroSiSesionDeGoogle() throws Exception {
+        // La creación sigue sin necesitar X-Api-Key, pero ahora exige la sesión de
+        // Google con versión >= 2 (S7): con el token del usuario V2 sembrado entra
         mockMvc.perform(post("/api/pedidos")
+                        .with(jwt().jwt(token -> token.claim("email", "mat.suazog@duocuc.cl"))
+                                .authorities(new SimpleGrantedAuthority("VERSION_1"),
+                                        new SimpleGrantedAuthority("VERSION_2")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"cliente\":\"Pedro Prueba\",\"email\":\"pedro@ejemplo.cl\","
                                 + "\"productos\":[{\"nombre\":\"Torta\",\"cantidad\":1,\"precioUnitario\":10000}]}"))

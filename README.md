@@ -27,7 +27,7 @@ Diseñado y construido por **8 Digital**.
 
 | Método HTTP | Ruta | Descripción |
 | :--- | :--- | :--- |
-| `POST` | `/api/pedidos` | Registra un pedido nuevo: lo persiste y publica el evento `PedidoCreado` en Kafka. |
+| `POST` | `/api/pedidos` | Registra un pedido nuevo: lo persiste y publica el evento `PedidoCreado` en Kafka. Exige sesión de Google con **versión ≥ 2**. |
 | `GET` | `/api/pedidos` | Lista todos los pedidos, los más recientes primero. |
 | `GET` | `/api/pedidos/{id}` | Consulta un pedido por su id (devuelve `404` si no existe). |
 | `PATCH` | `/api/pedidos/{id}/estado` | Cambia el estado de un pedido (RF-11): `200` actualizado, `400` si el estado no es válido, `404` si no existe. |
@@ -96,7 +96,7 @@ Versión habilitada por usuario (demo de las tres versiones). Devuelve `200` con
 
 ### POST /api/solicitudes
 
-Formulario de solicitud de pedido (Versión 1; NO es una venta). Cuerpo: `{"nombre": ..., "email": ..., "telefono": ..., "detalle": "Torta x2, Queque x1", "mensaje": ...}` (`telefono` y `mensaje` opcionales; `nombre`, `email` y `detalle` obligatorios). Devuelve `201` con la solicitud guardada (tabla `solicitudes`) o `400` con `{"mensaje": ...}` si falta un campo obligatorio. Al guardar publica el evento `solicitud_creada` en el topic de Kafka `solicitudes`, que el servicio de notificaciones procesa para enviar el correo "Pastelería My Dreams — Recibimos tu solicitud".
+Formulario de solicitud de pedido (Versión 1; NO es una venta). Exige sesión de Google con **versión ≥ 1**. Cuerpo: `{"nombre": ..., "email": ..., "telefono": ..., "detalle": "Torta x2, Queque x1", "mensaje": ...}` (`telefono` y `mensaje` opcionales; `nombre`, `email` y `detalle` obligatorios). Devuelve `201` con la solicitud guardada (tabla `solicitudes`) o `400` con `{"mensaje": ...}` si falta un campo obligatorio. Al guardar publica el evento `solicitud_creada` en el topic de Kafka `solicitudes`, que el servicio de notificaciones procesa para enviar el correo "Pastelería My Dreams — Recibimos tu solicitud".
 
 ### PATCH /api/pedidos/{id}/estado
 
@@ -174,6 +174,7 @@ La conexión a la base de datos se configura por variables de entorno, con defau
 | `DB_USER` | `root` |
 | `DB_PASS` | *(vacío)* |
 | `CATALOGO_URL` | `http://localhost:8080` (base de catalogo-service para consultar la Delicia del Día) |
+| `GOOGLE_CLIENT_ID` | *(vacío)* — client id de Google: es la audiencia del JWT que validan los endpoints de usuario (ver "Sesión con Google (JWT)") |
 
 Otras propiedades relevantes (`src/main/resources/application.properties`):
 
@@ -200,7 +201,7 @@ docker compose up -d         # broker Kafka (en este repo)
 .\mvnw.cmd test
 ```
 
-Los tests corren sobre H2 en memoria (ver `src/test/resources/application.properties`), por lo que no requieren MySQL ni Kafka levantados: hay tests unitarios del servicio, tests MockMvc de los endpoints (incluido el cambio de estado RF-11 y la regla de no retroceso) y un test de integración de publicación con broker embebido (`@EmbeddedKafka`). La suite completa son **66 pruebas**.
+Los tests corren sobre H2 en memoria (ver `src/test/resources/application.properties`), por lo que no requieren MySQL ni Kafka levantados: hay tests unitarios del servicio, tests MockMvc de los endpoints (incluido el cambio de estado RF-11 y la regla de no retroceso), tests de aceptación/rechazo de la sesión de Google (firma, emisor, audiencia y vencimiento del JWT, más la exigencia de versión por usuario) y un test de integración de publicación con broker embebido (`@EmbeddedKafka`). La suite completa son **87 pruebas**.
 
 ## 🔄 Flujo end-to-end
 
@@ -219,11 +220,29 @@ Kafka topic `pedidos`
 
 ## Seguridad (v2)
 
-- **Públicos sin autenticación:** `POST /api/pedidos` (crear pedido), `GET /api/pedidos/seguimiento/{codigo}` (consulta pública RF-11) y `GET /api/pedidos/bienvenida/estado` (elegibilidad del código de bienvenida).
+- **Sesión de Google obligatoria (JWT):** `POST /api/pedidos` y `POST /api/solicitudes` exigen el token de Google del usuario (ver "Sesión con Google (JWT)" más abajo). El resto de la postura de seguridad no cambió.
+- **Públicos sin autenticación:** `GET /api/pedidos/seguimiento/{codigo}` (consulta pública RF-11) y `GET /api/pedidos/bienvenida/estado` (elegibilidad del código de bienvenida).
 - **Protegidos con header `X-Api-Key`:** `GET /api/pedidos` (listado), `GET /api/pedidos/{id}`, `PATCH /api/pedidos/{id}/estado` y `GET /api/pedidos/estadisticas/productos` (unidades por producto del dashboard).
 - La clave se configura en la variable de entorno `APP_ADMIN_API_KEY` (propiedad `app.admin-api-key`). Si no está definida, los endpoints protegidos responden `503` (fail-closed: nunca quedan abiertos por omisión).
-- **Arranque local:** copia `.env.local.example` a `.env.local` y completa `APP_ADMIN_API_KEY` (mismo valor que `VITE_ADMIN_API_KEY` del frontend); `.\start-local.ps1` la carga antes de arrancar. Sin la variable, `.\mvnw.cmd spring-boot:run` arranca igual pero las escrituras responden `503`.
+- **Arranque local:** copia `.env.local.example` a `.env.local` y completa `APP_ADMIN_API_KEY` (mismo valor que `VITE_ADMIN_API_KEY` del frontend); `.\start-local.ps1` la carga antes de arrancar. Sin la variable, `.\mvnw.cmd spring-boot:run` arranca igual pero las escrituras administrativas responden `503`.
 - **Protección IDOR:** al registrar un pedido se genera un *código de seguimiento* opaco (UUID de 32 caracteres) que se devuelve en la respuesta del `POST`. La consulta pública usa ese código y **nunca** el id secuencial, de modo que no es posible adivinar pedidos de otros clientes.
+
+## Sesión con Google (JWT)
+
+El backend valida el **JWT de Google** con `spring-boot-starter-oauth2-resource-server`: firma contra el JWKS de Google, emisor `https://accounts.google.com` y audiencia igual al client id configurado. De ahí sale el email confiable del usuario y, con la tabla `usuarios_version`, las autoridades `VERSION_1..VERSION_N` (una versión N habilita también las anteriores):
+
+- `POST /api/pedidos` exige `VERSION_2` (compra de la V2).
+- `POST /api/solicitudes` exige `VERSION_1` (formulario de la V1).
+- Sin token válido responde `401 {"mensaje": "Se requiere sesión con Google"}`; con sesión válida pero sin la versión habilitada, `403 {"mensaje": "Tu versión no incluye esta función"}` (o `"Usuario sin versión habilitada"` si el email no está en la tabla).
+- El `email` del cuerpo de la petición es solo un **dato de contacto**: la versión se exige únicamente con el email del token validado.
+
+Propiedades (`src/main/resources/application.properties`):
+
+| Propiedad | Valor |
+| :--- | :--- |
+| `app.seguridad.jwt.audience` | `${GOOGLE_CLIENT_ID:}` — el **client id** de Google Auth Platform. Sin configurarlo los endpoints de usuario responden `401` (fail-closed). |
+| `app.seguridad.jwt.jwk-set-uri` | Origen de claves de Google (`https://www.googleapis.com/oauth2/v3/certs`); solo se fija si se quiere usar otro origen. |
+| `app.seguridad.jwt.public-key-pem` | Solo para **tests**: clave pública RSA local con la que el decoder valida sin salir a la red (los tests firman tokens reales con su clave privada). |
 
 ## Descuento de bienvenida (primera conexión)
 

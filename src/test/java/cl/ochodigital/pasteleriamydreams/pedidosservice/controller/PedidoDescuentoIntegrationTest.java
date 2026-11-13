@@ -9,10 +9,13 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import static org.hamcrest.Matchers.endsWith;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -40,9 +43,18 @@ class PedidoDescuentoIntegrationTest {
         pedidoRepository.deleteAll();
     }
 
+    // Sesión de Google preautenticada del usuario V2 sembrado (mat.suazog@duocuc.cl):
+    // POST /api/pedidos exige versión >= 2. El mapeo real email -> autoridades
+    // VERSION_1..N se prueba en AutenticacionJwtIntegrationTest.
+    private static RequestPostProcessor sesionUsuarioV2() {
+        return jwt().jwt(token -> token.claim("email", "mat.suazog@duocuc.cl"))
+                .authorities(new SimpleGrantedAuthority("VERSION_1"), new SimpleGrantedAuthority("VERSION_2"));
+    }
+
     @Test
     void pedidoConCodigoBienvenidaAplicaDiezPorCientoYLoPersiste() throws Exception {
         mockMvc.perform(post("/api/pedidos")
+                        .with(sesionUsuarioV2())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"cliente\":\"Primera Vez\",\"email\":\"primera@ejemplo.cl\","
                                 + "\"codigoDescuento\":\"BIENVENIDO10\","
@@ -69,6 +81,7 @@ class PedidoDescuentoIntegrationTest {
     @Test
     void pedidoConCodigoDesconocidoResponde400() throws Exception {
         mockMvc.perform(post("/api/pedidos")
+                        .with(sesionUsuarioV2())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"cliente\":\"Vuelve\",\"email\":\"vuelve@ejemplo.cl\","
                                 + "\"codigoDescuento\":\"AHORRO50\","
@@ -80,6 +93,7 @@ class PedidoDescuentoIntegrationTest {
     @Test
     void pedidoSinCodigoConservaElTotalCompleto() throws Exception {
         mockMvc.perform(post("/api/pedidos")
+                        .with(sesionUsuarioV2())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"cliente\":\"Sin Codigo\",\"email\":\"sincodigo@ejemplo.cl\","
                                 + "\"productos\":[{\"nombre\":\"Torta\",\"cantidad\":2,\"precioUnitario\":15000}]}"))
@@ -93,6 +107,7 @@ class PedidoDescuentoIntegrationTest {
     void segundoPedidoMismoEmailYCodigoResponde400() throws Exception {
         // Primer canje: sale bien
         mockMvc.perform(post("/api/pedidos")
+                        .with(sesionUsuarioV2())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"cliente\":\"Repetidor\",\"email\":\"repetidor@ejemplo.cl\","
                                 + "\"codigoDescuento\":\"BIENVENIDO10\","
@@ -101,6 +116,7 @@ class PedidoDescuentoIntegrationTest {
 
         // Uso unico por email: el segundo intento con el MISMO email y codigo se rechaza
         mockMvc.perform(post("/api/pedidos")
+                        .with(sesionUsuarioV2())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"cliente\":\"Repetidor\",\"email\":\"repetidor@ejemplo.cl\","
                                 + "\"codigoDescuento\":\"BIENVENIDO10\","
@@ -114,6 +130,7 @@ class PedidoDescuentoIntegrationTest {
     void otroEmailPuedeUsarElMismoCodigo() throws Exception {
         // Cada cliente nuevo se lleva su bienvenida: el codigo no es global
         mockMvc.perform(post("/api/pedidos")
+                        .with(sesionUsuarioV2())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"cliente\":\"Uno\",\"email\":\"uno@ejemplo.cl\","
                                 + "\"codigoDescuento\":\"BIENVENIDO10\","
@@ -121,6 +138,7 @@ class PedidoDescuentoIntegrationTest {
                 .andExpect(status().isCreated());
 
         mockMvc.perform(post("/api/pedidos")
+                        .with(sesionUsuarioV2())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"cliente\":\"Otro\",\"email\":\"otro@ejemplo.cl\","
                                 + "\"codigoDescuento\":\"BIENVENIDO10\","
@@ -139,6 +157,7 @@ class PedidoDescuentoIntegrationTest {
 
         // Ese email canjea el codigo en un pedido real
         mockMvc.perform(post("/api/pedidos")
+                        .with(sesionUsuarioV2())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"cliente\":\"Ya Canjeo\",\"email\":\"ya-canjeo@ejemplo.cl\","
                                 + "\"codigoDescuento\":\"BIENVENIDO10\","
@@ -172,6 +191,7 @@ class PedidoDescuentoIntegrationTest {
     @Test
     void laFechaSeSerializaEnUtcConSufijoZ() throws Exception {
         mockMvc.perform(post("/api/pedidos")
+                        .with(sesionUsuarioV2())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"cliente\":\"Zona Horaria\",\"email\":\"zona@ejemplo.cl\","
                                 + "\"productos\":[{\"nombre\":\"Torta\",\"cantidad\":1,\"precioUnitario\":10000}]}"))
