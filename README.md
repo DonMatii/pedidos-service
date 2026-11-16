@@ -34,7 +34,7 @@ Diseñado y construido por **8 Digital**.
 | `GET` | `/api/pedidos/bienvenida/estado` | Consulta pública la elegibilidad del código `BIENVENIDO10` para un email: `{ "elegible": true \| false }`. El frontend la usa antes de prometer el descuento. |
 | `GET` | `/api/pedidos/estadisticas/productos?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` | Qué se vendió en un rango de fechas: lista de `{ nombre, unidades, monto }` por producto, de más a menos vendido. El rango se compara por **fecha calendario**, de modo que los pedidos de la madrugada caen en su día aunque la base guarde en UTC. Alimenta el dashboard de administración (S3). Requiere `X-Api-Key`. |
 
-CORS está abierto para dos orígenes: el frontend local `http://localhost:5173` y el sitio público desplegado en S3 (`http://pasteleria-my-dreams-web-8digital.s3-website-us-east-1.amazonaws.com`).
+CORS está abierto para cualquier origen (`origins = "*"`): el sitio público se despliega en AWS Amplify (`https://pasteleria-my-dreams-8digital.d3u0ha987fxjn1.amplifyapp.com`) y su dominio puede cambiar, así que una lista explícita de orígenes lo rechazaba con `403 Invalid CORS request`. La protección real no está en el origen: las escrituras exigen `X-Api-Key` y las rutas de cliente exigen el JWT de Google validado con JWKS.
 
 ### POST /api/pedidos
 
@@ -162,7 +162,7 @@ docker compose down -v  # baja el broker y BORRA los datos (volumen)
 * Incluye `healthcheck` (lista los topics cada 10 s) y volumen persistente `kafka-data`.
 * El topic se crea automáticamente (`KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"`).
 
-Es solo para desarrollo local. El despliegue en la nube usará el mismo `docker-compose.yml` en EC2.
+Es solo para desarrollo local. **En AWS no se usa Docker**: el broker Kafka 3.9 corre en modo **KRaft nativo** en una EC2 propia, con unit de `systemd` y los topics `pedidos`, `pedidos-estados` y `solicitudes`; este repositorio conserva el `docker-compose.yml` como artefacto del stack local.
 
 ## ⚙️ Variables de entorno
 
@@ -181,7 +181,7 @@ Otras propiedades relevantes (`src/main/resources/application.properties`):
 | Propiedad | Valor |
 | :--- | :--- |
 | `server.port` | `8082` |
-| `spring.kafka.bootstrap-servers` | `localhost:19092` |
+| `spring.kafka.bootstrap-servers` | `${KAFKA_BOOTSTRAP:localhost:19092}` (en AWS se sobrescribe con la IP del broker Kafka nativo) |
 | `app.kafka.topic` | `pedidos` |
 | `app.catalogo.base-url` | `${CATALOGO_URL:http://localhost:8080}` (URL de catalogo-service) |
 | `spring.jpa.hibernate.ddl-auto` | `update` (crea/actualiza `pedidos` y `pedido_items` al arrancar) |
