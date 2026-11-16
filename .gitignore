@@ -43,6 +43,7 @@ build/
 odd/
 
 # Credenciales locales (nunca se commitean)
+credenciales-local.md
 .env.local
 !.env.local.example
 
