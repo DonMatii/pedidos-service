@@ -15,10 +15,7 @@ import java.util.Map;
 // versión ≥ 1; el AdminApiKeyFilter sigue protegiendo solo el panel de /api/pedidos.
 @RestController
 @RequestMapping("/api/solicitudes")
-@CrossOrigin(origins = {
-        "http://localhost:5173",
-        "http://pasteleria-my-dreams-web-8digital.s3-website-us-east-1.amazonaws.com"
-})
+@CrossOrigin(origins = "*", allowedHeaders = "*", methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.PATCH, RequestMethod.DELETE, RequestMethod.OPTIONS})
 public class SolicitudController {
 
     private final SolicitudService solicitudService;
